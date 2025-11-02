@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  # PostgreSQL - Relational database for users, matches
+  postgres:
+    image: postgres:15-alpine
+    container_name: tank-postgres
+    environment:
+      POSTGRES_DB: tank_royale
+      POSTGRES_USER: tank_user
+      POSTGRES_PASSWORD: dev_password_123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/postgres:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tank_user -d tank_royale"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis - In-memory cache for leaderboards, sessions
+  redis:
+    image: redis:7-alpine
+    container_name: tank-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Cassandra - NoSQL for game events, telemetry
+  cassandra:
+    image: cassandra:4.1
+    container_name: tank-cassandra
+    environment:
+      CASSANDRA_CLUSTER_NAME: tank_cluster
+      CASSANDRA_DC: dc1
+      CASSANDRA_RACK: rack1
+      MAX_HEAP_SIZE: 512M
+      HEAP_NEWSIZE: 128M
+    ports:
+      - "9042:9042"
+    volumes:
+      - cassandra_data:/var/lib/cassandra
+      - ./database/cassandra:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "cqlsh", "-e", "describe keyspaces"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  # Redis Commander (Optional) - GUI for Redis
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: tank-redis-commander
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+
+  # pgAdmin (Optional) - GUI for PostgreSQL
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: tank-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@tankroyale.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "8080:80"
+    depends_on:
+      - postgres
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  cassandra_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+networks:
+  default:
+    name: tank-royale-network
