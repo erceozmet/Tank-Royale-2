@@ -7,7 +7,9 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "jest",
+    "test": "jest --coverage",
+    "test:watch": "jest --watch",
+    "test:unit": "jest --testPathPattern=tests/unit",
     "lint": "eslint src --ext .ts",
     "format": "prettier --write \"src/**/*.ts\""
   },
@@ -37,6 +39,9 @@
     "typescript": "^5.1.6",
     "ts-node-dev": "^2.0.0",
     "jest": "^29.6.1",
-    "@types/jest": "^29.5.3"
+    "@types/jest": "^29.5.3",
+    "ts-jest": "^29.1.1",
+    "@types/supertest": "^2.0.12",
+    "supertest": "^6.3.3"
   }
 }

@@ -5,6 +5,9 @@ import dotenv from 'dotenv';
 import { initPostgres, closePostgres } from './db/postgres';
 import { initRedis, closeRedis } from './db/redis';
 import authRoutes from './routes/auth';
+import leaderboardRoutes from './routes/leaderboard';
+import usersRoutes from './routes/users';
+import matchmakingRoutes, { processMatchmaking } from './routes/matchmaking';
 import { authenticate } from './middleware/auth';
 
 // Load environment variables
@@ -64,6 +67,9 @@ app.get('/', (req, res) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/leaderboard', leaderboardRoutes);
+app.use('/api/users', usersRoutes);
+app.use('/api/matchmaking', matchmakingRoutes);
 
 // Protected route example
 app.get('/api/protected', authenticate, (req, res) => {
@@ -88,6 +94,13 @@ async function startServer() {
       console.log(`✅ Server running on http://localhost:${PORT}`);
       console.log(`📊 Health check: http://localhost:${PORT}/health`);
     });
+
+    // Start background matchmaking process (runs every 2 seconds)
+    setInterval(() => {
+      processMatchmaking().catch(err => {
+        console.error('[MATCHMAKING] Background process error:', err);
+      });
+    }, 2000);
   } catch (error) {
     console.error('❌ Failed to start server:', error);
     process.exit(1);

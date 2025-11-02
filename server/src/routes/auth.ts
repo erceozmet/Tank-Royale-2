@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
-import { query } from '../db/postgres';
 import { hashPassword, comparePassword, generateToken, isValidEmail, isValidUsername, isValidPassword } from '../auth/utils';
 import { authenticate } from '../middleware/auth';
+import { userRepository } from '../repositories';
 
 const router = Router();
 
@@ -35,12 +35,9 @@ router.post('/register', async (req: Request, res: Response) => {
     }
 
     // Check if user already exists
-    const existingUser = await query(
-      'SELECT user_id FROM users WHERE username = $1 OR email = $2',
-      [username, email]
-    );
+    const existingUser = await userRepository.usernameOrEmailExists(username, email);
 
-    if (existingUser.rows.length > 0) {
+    if (existingUser) {
       return res.status(409).json({ error: 'Username or email already exists' });
     }
 
@@ -48,27 +45,20 @@ router.post('/register', async (req: Request, res: Response) => {
     const passwordHash = await hashPassword(password);
 
     // Create user
-    const result = await query(
-      `INSERT INTO users (username, email, password_hash)
-       VALUES ($1, $2, $3)
-       RETURNING user_id, username, email, mmr, created_at`,
-      [username, email, passwordHash]
-    );
-
-    const user = result.rows[0];
+    const user = await userRepository.create({ username, email, passwordHash });
 
     // Generate JWT token
-    const token = generateToken(user.user_id, user.username);
+    const token = generateToken(user.userId, user.username);
 
     res.status(201).json({
       message: 'User registered successfully',
       token,
       user: {
-        userId: user.user_id,
+        userId: user.userId,
         username: user.username,
         email: user.email,
         mmr: user.mmr,
-        createdAt: user.created_at,
+        createdAt: user.createdAt,
       },
     });
   } catch (error) {
@@ -90,45 +80,35 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     // Find user by username or email
-    const result = await query(
-      `SELECT user_id, username, email, password_hash, mmr, total_wins, total_losses
-       FROM users 
-       WHERE username = $1 OR email = $1`,
-      [usernameOrEmail]
-    );
+    const user = await userRepository.findByUsernameOrEmail(usernameOrEmail);
 
-    if (result.rows.length === 0) {
+    if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const user = result.rows[0];
-
     // Verify password
-    const isPasswordValid = await comparePassword(password, user.password_hash);
+    const isPasswordValid = await comparePassword(password, user.passwordHash);
 
     if (!isPasswordValid) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     // Update last login timestamp
-    await query(
-      'UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE user_id = $1',
-      [user.user_id]
-    );
+    await userRepository.updateLastLogin(user.userId);
 
     // Generate JWT token
-    const token = generateToken(user.user_id, user.username);
+    const token = generateToken(user.userId, user.username);
 
     res.json({
       message: 'Login successful',
       token,
       user: {
-        userId: user.user_id,
+        userId: user.userId,
         username: user.username,
         email: user.email,
         mmr: user.mmr,
-        totalWins: user.total_wins,
-        totalLosses: user.total_losses,
+        totalWins: user.totalWins,
+        totalLosses: user.totalLosses,
       },
     });
   } catch (error) {
@@ -149,36 +129,29 @@ router.get('/me', authenticate, async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const result = await query(
-      `SELECT user_id, username, email, mmr, total_wins, total_losses, 
-              total_kills, total_deaths, created_at, last_login
-       FROM users 
-       WHERE user_id = $1`,
-      [userId]
-    );
+    const user = await userRepository.findById(userId);
 
-    if (result.rows.length === 0) {
+    if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const user = result.rows[0];
+    const stats = await userRepository.getStats(userId);
 
     res.json({
-      userId: user.user_id,
+      userId: user.userId,
       username: user.username,
       email: user.email,
-      stats: {
+      stats: stats || {
         mmr: user.mmr,
-        totalWins: user.total_wins,
-        totalLosses: user.total_losses,
-        totalKills: user.total_kills,
-        totalDeaths: user.total_deaths,
-        winRate: user.total_wins + user.total_losses > 0
-          ? ((user.total_wins / (user.total_wins + user.total_losses)) * 100).toFixed(2)
-          : '0.00',
+        totalWins: user.totalWins,
+        totalLosses: user.totalLosses,
+        totalKills: user.totalKills,
+        totalDeaths: user.totalDeaths,
+        winRate: '0.00',
+        kdr: '0.00',
       },
-      createdAt: user.created_at,
-      lastLogin: user.last_login,
+      createdAt: user.createdAt,
+      lastLogin: user.lastLogin,
     });
   } catch (error) {
     console.error('[AUTH] Get profile error:', error);
