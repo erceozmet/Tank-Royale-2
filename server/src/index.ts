@@ -1,19 +1,24 @@
 import express, { Application } from 'express';
+import { createServer } from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { initPostgres, closePostgres } from './db/postgres';
 import { initRedis, closeRedis } from './db/redis';
+import { initWebSocket } from './websocket';
+import { registerMatchmakingHandlers } from './websocket/matchmakingHandlers';
+import { startMatchmaking, stopMatchmaking } from './services/MatchmakingService';
 import authRoutes from './routes/auth';
 import leaderboardRoutes from './routes/leaderboard';
 import usersRoutes from './routes/users';
-import matchmakingRoutes, { processMatchmaking } from './routes/matchmaking';
+import matchmakingRoutes from './routes/matchmaking';
 import { authenticate } from './middleware/auth';
 
 // Load environment variables
 dotenv.config({ path: '../.env.local' });
 
 const app: Application = express();
+const httpServer = createServer(app);
 const PORT = process.env.PORT || 3000;
 
 // Request logging middleware
@@ -89,18 +94,19 @@ async function startServer() {
     await initPostgres();
     await initRedis();
     
+    // Initialize WebSocket server
+    const io = initWebSocket(httpServer);
+    registerMatchmakingHandlers(io);
+    
+    // Start matchmaking service
+    startMatchmaking();
+    
     // Start listening
-    app.listen(PORT, () => {
+    httpServer.listen(PORT, () => {
       console.log(`✅ Server running on http://localhost:${PORT}`);
       console.log(`📊 Health check: http://localhost:${PORT}/health`);
+      console.log(`🔌 WebSocket server ready`);
     });
-
-    // Start background matchmaking process (runs every 2 seconds)
-    setInterval(() => {
-      processMatchmaking().catch(err => {
-        console.error('[MATCHMAKING] Background process error:', err);
-      });
-    }, 2000);
   } catch (error) {
     console.error('❌ Failed to start server:', error);
     process.exit(1);
@@ -110,6 +116,7 @@ async function startServer() {
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   console.log('📡 SIGTERM signal received. Closing server...');
+  stopMatchmaking();
   await closePostgres();
   await closeRedis();
   process.exit(0);
@@ -117,6 +124,7 @@ process.on('SIGTERM', async () => {
 
 process.on('SIGINT', async () => {
   console.log('📡 SIGINT signal received. Closing server...');
+  stopMatchmaking();
   await closePostgres();
   await closeRedis();
   process.exit(0);

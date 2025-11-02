@@ -148,3 +148,6 @@ postman/*.postman_environment.json
 
 # Keep collection files
 !postman/*.postman_collection.json
+server/docs/TESTING_SUMMARY.md
+server/TEST_VERIFICATION.md
+docs/WEBSOCKET_MATCHMAKING.md

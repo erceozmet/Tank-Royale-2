@@ -1,4 +1,4 @@
-import { Pool, PoolClient, QueryResult } from 'pg';
+import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -88,7 +88,7 @@ export function getPool(): Pool {
  * Execute a query with the pool
  * Convenience wrapper around pool.query()
  */
-export async function query<T = any>(
+export async function query<T extends QueryResultRow = any>(
   text: string,
   params?: any[]
 ): Promise<QueryResult<T>> {

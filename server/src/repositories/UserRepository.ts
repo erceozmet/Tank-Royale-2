@@ -1,4 +1,5 @@
 import { query } from '../db/postgres';
+import { userQueries } from './queries';
 
 export interface User {
   userId: string;
@@ -35,24 +36,7 @@ export class UserRepository {
    * Find user by ID
    */
   async findById(userId: string): Promise<User | null> {
-    const result = await query(
-      `SELECT 
-        user_id as "userId",
-        username,
-        email,
-        password_hash as "passwordHash",
-        mmr,
-        total_wins as "totalWins",
-        total_losses as "totalLosses",
-        total_kills as "totalKills",
-        total_deaths as "totalDeaths",
-        created_at as "createdAt",
-        last_login as "lastLogin"
-       FROM users
-       WHERE user_id = $1`,
-      [userId]
-    );
-
+    const result = await query(userQueries.findById, [userId]);
     return result.rows[0] || null;
   }
 
@@ -60,24 +44,7 @@ export class UserRepository {
    * Find user by username
    */
   async findByUsername(username: string): Promise<User | null> {
-    const result = await query(
-      `SELECT 
-        user_id as "userId",
-        username,
-        email,
-        password_hash as "passwordHash",
-        mmr,
-        total_wins as "totalWins",
-        total_losses as "totalLosses",
-        total_kills as "totalKills",
-        total_deaths as "totalDeaths",
-        created_at as "createdAt",
-        last_login as "lastLogin"
-       FROM users
-       WHERE username = $1`,
-      [username]
-    );
-
+    const result = await query(userQueries.findByUsername, [username]);
     return result.rows[0] || null;
   }
 
@@ -85,24 +52,7 @@ export class UserRepository {
    * Find user by email
    */
   async findByEmail(email: string): Promise<User | null> {
-    const result = await query(
-      `SELECT 
-        user_id as "userId",
-        username,
-        email,
-        password_hash as "passwordHash",
-        mmr,
-        total_wins as "totalWins",
-        total_losses as "totalLosses",
-        total_kills as "totalKills",
-        total_deaths as "totalDeaths",
-        created_at as "createdAt",
-        last_login as "lastLogin"
-       FROM users
-       WHERE email = $1`,
-      [email]
-    );
-
+    const result = await query(userQueries.findByEmail, [email]);
     return result.rows[0] || null;
   }
 
@@ -110,24 +60,7 @@ export class UserRepository {
    * Find user by username OR email
    */
   async findByUsernameOrEmail(usernameOrEmail: string): Promise<User | null> {
-    const result = await query(
-      `SELECT 
-        user_id as "userId",
-        username,
-        email,
-        password_hash as "passwordHash",
-        mmr,
-        total_wins as "totalWins",
-        total_losses as "totalLosses",
-        total_kills as "totalKills",
-        total_deaths as "totalDeaths",
-        created_at as "createdAt",
-        last_login as "lastLogin"
-       FROM users
-       WHERE username = $1 OR email = $1`,
-      [usernameOrEmail]
-    );
-
+    const result = await query(userQueries.findByUsernameOrEmail, [usernameOrEmail]);
     return result.rows[0] || null;
   }
 
@@ -135,10 +68,7 @@ export class UserRepository {
    * Check if username exists
    */
   async usernameExists(username: string): Promise<boolean> {
-    const result = await query(
-      'SELECT 1 FROM users WHERE username = $1',
-      [username]
-    );
+    const result = await query(userQueries.usernameExists, [username]);
     return result.rows.length > 0;
   }
 
@@ -146,10 +76,7 @@ export class UserRepository {
    * Check if email exists
    */
   async emailExists(email: string): Promise<boolean> {
-    const result = await query(
-      'SELECT 1 FROM users WHERE email = $1',
-      [email]
-    );
+    const result = await query(userQueries.emailExists, [email]);
     return result.rows.length > 0;
   }
 
@@ -157,10 +84,7 @@ export class UserRepository {
    * Check if username or email exists
    */
   async usernameOrEmailExists(username: string, email: string): Promise<boolean> {
-    const result = await query(
-      'SELECT 1 FROM users WHERE username = $1 OR email = $2',
-      [username, email]
-    );
+    const result = await query(userQueries.usernameOrEmailExists, [username, email]);
     return result.rows.length > 0;
   }
 
@@ -168,24 +92,7 @@ export class UserRepository {
    * Create a new user
    */
   async create(params: CreateUserParams): Promise<User> {
-    const result = await query(
-      `INSERT INTO users (username, email, password_hash)
-       VALUES ($1, $2, $3)
-       RETURNING 
-        user_id as "userId",
-        username,
-        email,
-        password_hash as "passwordHash",
-        mmr,
-        total_wins as "totalWins",
-        total_losses as "totalLosses",
-        total_kills as "totalKills",
-        total_deaths as "totalDeaths",
-        created_at as "createdAt",
-        last_login as "lastLogin"`,
-      [params.username, params.email, params.passwordHash]
-    );
-
+    const result = await query(userQueries.create, [params.username, params.email, params.passwordHash]);
     return result.rows[0];
   }
 
@@ -193,37 +100,14 @@ export class UserRepository {
    * Update last login timestamp
    */
   async updateLastLogin(userId: string): Promise<void> {
-    await query(
-      'UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE user_id = $1',
-      [userId]
-    );
+    await query(userQueries.updateLastLogin, [userId]);
   }
 
   /**
    * Get user stats with calculated fields
    */
   async getStats(userId: string): Promise<UserStats | null> {
-    const result = await query(
-      `SELECT 
-        mmr,
-        total_wins as "totalWins",
-        total_losses as "totalLosses",
-        total_kills as "totalKills",
-        total_deaths as "totalDeaths",
-        CASE 
-          WHEN (total_wins + total_losses) > 0 
-          THEN ROUND((total_wins::numeric / (total_wins + total_losses)) * 100, 2)
-          ELSE 0 
-        END as "winRate",
-        CASE 
-          WHEN total_deaths > 0 
-          THEN ROUND(total_kills::numeric / total_deaths, 2)
-          ELSE total_kills 
-        END as kdr
-       FROM users
-       WHERE user_id = $1`,
-      [userId]
-    );
+    const result = await query(userQueries.getStats, [userId]);
 
     if (result.rows.length === 0) {
       return null;
@@ -245,26 +129,7 @@ export class UserRepository {
    * Search users by username pattern
    */
   async search(searchQuery: string, limit: number = 20): Promise<User[]> {
-    const result = await query(
-      `SELECT 
-        user_id as "userId",
-        username,
-        email,
-        password_hash as "passwordHash",
-        mmr,
-        total_wins as "totalWins",
-        total_losses as "totalLosses",
-        total_kills as "totalKills",
-        total_deaths as "totalDeaths",
-        created_at as "createdAt",
-        last_login as "lastLogin"
-       FROM users
-       WHERE username ILIKE $1
-       ORDER BY mmr DESC
-       LIMIT $2`,
-      [`%${searchQuery}%`, limit]
-    );
-
+    const result = await query(userQueries.search, [`%${searchQuery}%`, limit]);
     return result.rows;
   }
 }
