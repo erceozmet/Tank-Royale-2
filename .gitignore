@@ -141,3 +141,10 @@ public
 
 # Start here guide (for initial setup only)
 START_HERE.md
+
+# Postman environment files (may contain sensitive tokens)
+postman/*environment*.json
+postman/*.postman_environment.json
+
+# Keep collection files
+!postman/*.postman_collection.json

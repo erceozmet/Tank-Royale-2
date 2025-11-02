@@ -13,6 +13,22 @@ dotenv.config({ path: '../.env.local' });
 const app: Application = express();
 const PORT = process.env.PORT || 3000;
 
+// Request logging middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  
+  // Log response when finished
+  const originalSend = res.send.bind(res);
+  res.send = function(this: any, data: any) {
+    const duration = Date.now() - start;
+    const status = res.statusCode >= 500 ? '✗' : res.statusCode >= 400 ? '⚠' : '✓';
+    console.log(`[${status}] ${req.method} ${req.path} ${res.statusCode} (${duration}ms)`);
+    return originalSend(data);
+  };
+  
+  next();
+});
+
 // Middleware
 app.use(helmet()); // Security headers
 app.use(cors()); // Enable CORS

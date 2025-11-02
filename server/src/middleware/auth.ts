@@ -8,7 +8,6 @@ import { verifyToken } from '../auth/utils';
  */
 export function authenticate(req: Request, res: Response, next: NextFunction) {
   try {
-    // Get token from Authorization header
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -16,11 +15,9 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
     }
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-
-    // Verify token
     const decoded = verifyToken(token);
 
-    // Add user info to request object
+    // Add user info to request
     (req as any).userId = decoded.userId;
     (req as any).username = decoded.username;
 

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { query } from '../db/postgres';
 import { hashPassword, comparePassword, generateToken, isValidEmail, isValidUsername, isValidPassword } from '../auth/utils';
+import { authenticate } from '../middleware/auth';
 
 const router = Router();
 
@@ -71,7 +72,7 @@ router.post('/register', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('Registration error:', error);
+    console.error('[AUTH] Registration error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -131,7 +132,7 @@ router.post('/login', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('[AUTH] Login error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -140,10 +141,9 @@ router.post('/login', async (req: Request, res: Response) => {
  * GET /api/auth/me
  * Get current user profile (requires authentication)
  */
-router.get('/me', async (req: Request, res: Response) => {
+router.get('/me', authenticate, async (req: Request, res: Response) => {
   try {
-    // This will be protected by auth middleware (we'll add it next)
-    const userId = (req as any).userId; // Will be set by auth middleware
+    const userId = (req as any).userId; // Set by auth middleware
 
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -181,7 +181,7 @@ router.get('/me', async (req: Request, res: Response) => {
       lastLogin: user.last_login,
     });
   } catch (error) {
-    console.error('Get profile error:', error);
+    console.error('[AUTH] Get profile error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

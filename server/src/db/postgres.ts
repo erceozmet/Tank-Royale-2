@@ -101,14 +101,14 @@ export async function query<T = any>(
     
     // Log slow queries (> 100ms)
     if (duration > 100) {
-      console.warn(`⚠️  Slow query (${duration}ms):`, text.substring(0, 100));
+      console.warn(`[DB] Slow query (${duration}ms): ${text.substring(0, 80)}...`);
     }
     
     return result;
   } catch (error) {
-    console.error('❌ Database query error:', error);
-    console.error('Query:', text);
-    console.error('Params:', params);
+    const duration = Date.now() - start;
+    console.error(`[DB] Query error (${duration}ms):`, error);
+    console.error('[DB] Query:', text);
     throw error;
   }
 }
@@ -124,12 +124,6 @@ export async function getClient(): Promise<PoolClient> {
 
 /**
  * Execute a transaction with automatic rollback on error
- * 
- * @example
- * await transaction(async (client) => {
- *   await client.query('INSERT INTO users ...');
- *   await client.query('INSERT INTO match_results ...');
- * });
  */
 export async function transaction<T>(
   callback: (client: PoolClient) => Promise<T>
@@ -143,7 +137,7 @@ export async function transaction<T>(
     return result;
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('❌ Transaction rolled back:', error);
+    console.error('[DB] Transaction rolled back:', error);
     throw error;
   } finally {
     client.release();
