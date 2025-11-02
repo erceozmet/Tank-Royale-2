@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { hashPassword, comparePassword, generateToken, isValidEmail, isValidUsername, isValidPassword } from '../auth/utils';
 import { authenticate } from '../middleware/auth';
 import { userRepository } from '../repositories';
+import { authAttempts } from '../middleware/metrics';
 
 const router = Router();
 
@@ -50,6 +51,9 @@ router.post('/register', async (req: Request, res: Response) => {
     // Generate JWT token
     const token = generateToken(user.userId, user.username);
 
+    // Track successful authentication
+    authAttempts.labels('success').inc();
+
     res.status(201).json({
       message: 'User registered successfully',
       token,
@@ -83,6 +87,7 @@ router.post('/login', async (req: Request, res: Response) => {
     const user = await userRepository.findByUsernameOrEmail(usernameOrEmail);
 
     if (!user) {
+      authAttempts.labels('failure').inc();
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
@@ -90,6 +95,7 @@ router.post('/login', async (req: Request, res: Response) => {
     const isPasswordValid = await comparePassword(password, user.passwordHash);
 
     if (!isPasswordValid) {
+      authAttempts.labels('failure').inc();
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
@@ -98,6 +104,9 @@ router.post('/login', async (req: Request, res: Response) => {
 
     // Generate JWT token
     const token = generateToken(user.userId, user.username);
+
+    // Track successful authentication
+    authAttempts.labels('success').inc();
 
     res.json({
       message: 'Login successful',

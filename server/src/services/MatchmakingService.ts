@@ -1,6 +1,7 @@
 import { AuthenticatedSocket, emitToUser, emitToUsers } from '../websocket';
 import { RedisMatchmakingQueue } from '../db/redis';
 import { userRepository } from '../repositories/UserRepository';
+import { matchmakingQueueSize, activeMatches, matchesCreated } from '../middleware/metrics';
 
 export interface MatchmakingPlayer {
   userId: string;
@@ -94,6 +95,9 @@ export async function joinQueue(socket: AuthenticatedSocket): Promise<void> {
     // Add to Redis queue
     await RedisMatchmakingQueue.addToQueue(userId, user.mmr);
 
+    // Update metrics
+    matchmakingQueueSize.set(await RedisMatchmakingQueue.getQueueSize());
+
     // Notify player
     socket.emit('matchmaking:joined', {
       userId,
@@ -128,6 +132,9 @@ export async function leaveQueue(userId: string): Promise<void> {
 
     // Remove from Redis queue
     await RedisMatchmakingQueue.removeFromQueue(userId);
+
+    // Update metrics
+    matchmakingQueueSize.set(await RedisMatchmakingQueue.getQueueSize());
 
     // Notify player
     if (player.socket.connected) {
@@ -244,6 +251,11 @@ async function createLobby(playerIds: string[]): Promise<void> {
     };
 
     activeLobbies.set(lobbyId, lobby);
+
+    // Update metrics
+    activeMatches.set(activeLobbies.size);
+    matchesCreated.inc();
+    matchmakingQueueSize.set(await RedisMatchmakingQueue.getQueueSize());
 
     // Notify all players
     const playerData = players.map(p => ({

@@ -1,0 +1,139 @@
+config:
+  target: "http://localhost:3000"
+  phases:
+    # Warm-up phase: Start slow
+    - duration: 30
+      arrivalRate: 5
+      name: "Warm-up"
+    
+    # Ramp-up phase: Gradually increase load
+    - duration: 60
+      arrivalRate: 10
+      rampTo: 25
+      name: "Ramp-up"
+    
+    # Peak load phase: Maximum sustained load
+    - duration: 120
+      arrivalRate: 50
+      name: "Peak Load"
+    
+    # Cool-down phase: Reduce load
+    - duration: 30
+      arrivalRate: 10
+      name: "Cool-down"
+
+  processor: "./processors/auth-processor.js"
+  
+  # Metrics configuration
+  ensure:
+    maxErrorRate: 1  # Max 1% error rate
+    p95: 500        # 95th percentile < 500ms
+    p99: 1000       # 99th percentile < 1000ms
+
+scenarios:
+  # Scenario 1: User Registration Flow
+  - name: "User Registration"
+    weight: 20
+    flow:
+      - post:
+          url: "/api/auth/register"
+          json:
+            username: "loadtest_{{ $randomString() }}"
+            email: "loadtest_{{ $randomString() }}@test.com"
+            password: "TestPassword123!"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+            - json: "$.userId"
+              as: "userId"
+      - think: 2  # Wait 2 seconds
+
+  # Scenario 2: User Login Flow
+  - name: "User Login"
+    weight: 30
+    flow:
+      - post:
+          url: "/api/auth/login"
+          beforeRequest: "setExistingUser"
+          json:
+            email: "{{ email }}"
+            password: "{{ password }}"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+            - json: "$.userId"
+              as: "userId"
+      - think: 1
+
+  # Scenario 3: Fetch User Profile
+  - name: "Get User Profile"
+    weight: 25
+    flow:
+      - post:
+          url: "/api/auth/login"
+          beforeRequest: "setExistingUser"
+          json:
+            email: "{{ email }}"
+            password: "{{ password }}"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+            - json: "$.userId"
+              as: "userId"
+      - get:
+          url: "/api/users/{{ userId }}"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+      - think: 2
+
+  # Scenario 4: View Leaderboard
+  - name: "Get Leaderboard"
+    weight: 25
+    flow:
+      - get:
+          url: "/api/leaderboard/wins?limit=50"
+      - think: 3
+      - get:
+          url: "/api/leaderboard/mmr?limit=50"
+      - think: 2
+
+  # Scenario 5: Full User Journey
+  - name: "Complete User Journey"
+    weight: 10
+    flow:
+      # Login
+      - post:
+          url: "/api/auth/login"
+          beforeRequest: "setExistingUser"
+          json:
+            email: "{{ email }}"
+            password: "{{ password }}"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+            - json: "$.userId"
+              as: "userId"
+      - think: 1
+      
+      # Check profile
+      - get:
+          url: "/api/users/{{ userId }}"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+      - think: 2
+      
+      # View leaderboards
+      - get:
+          url: "/api/leaderboard/wins?limit=50"
+      - think: 2
+      
+      # Check health
+      - get:
+          url: "/health"
+      - think: 1
+      
+      # Logout
+      - post:
+          url: "/api/auth/logout"
+          headers:
+            Authorization: "Bearer {{ authToken }}"

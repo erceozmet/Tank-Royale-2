@@ -2,6 +2,7 @@ import { Server as HttpServer } from 'http';
 import { Server, Socket } from 'socket.io';
 import { verifyToken } from '../auth/utils';
 import { RedisSessionManager } from '../db/redis';
+import { websocketConnections } from '../middleware/metrics';
 
 export interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -59,6 +60,9 @@ export function initWebSocket(httpServer: HttpServer): Server {
   // Connection handler
   io.on('connection', (socket: AuthenticatedSocket) => {
     console.log(`✅ WebSocket connected: ${socket.userId} (${socket.username})`);
+    
+    // Increment WebSocket connections metric
+    websocketConnections.inc();
 
     // Join user to their personal room
     socket.join(`user:${socket.userId}`);
@@ -75,6 +79,8 @@ export function initWebSocket(httpServer: HttpServer): Server {
     // Handle disconnect
     socket.on('disconnect', (reason) => {
       console.log(`❌ WebSocket disconnected: ${socket.userId} - ${reason}`);
+      // Decrement WebSocket connections metric
+      websocketConnections.dec();
       handleDisconnect(socket);
     });
 

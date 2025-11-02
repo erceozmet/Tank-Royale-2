@@ -175,26 +175,52 @@ This project showcases advanced system design concepts:
 
 ## 🚀 Quick Start
 
+### First Time Setup
 ```bash
-# Clone and install
+# Clone the repository
 git clone <repository-url>
 cd tank-royale-2
-npm install && npm run install:all
 
-# Set up environment
-cp .env.example .env
+# Install dependencies
+cd server && npm install
+cd ../load-tests && npm install
+cd ..
 
-# Start databases
-docker-compose up -d
-
-# Build shared package
-cd shared && npm run build && cd ..
-
-# Start all services
-npm run dev
+# Start all containers with one command
+./tank.sh setup
 ```
 
-Visit `http://localhost:5173` to play!
+### Regular Development
+```bash
+# Start all containers (databases, monitoring, admin tools)
+./tank.sh start
+
+# Start the API server
+cd server && npm run dev
+
+# In another terminal: Run load tests
+cd load-tests && npm run test:quick
+```
+
+### Stop Everything
+```bash
+# Stop all containers
+./tank.sh stop
+```
+
+### Quick Help
+```bash
+# See all available commands
+./tank.sh help
+```
+
+Visit:
+- **Grafana Dashboard**: http://localhost:3001 (admin/admin123)
+- **Prometheus**: http://localhost:9090
+- **pgAdmin**: http://localhost:8080
+- **Redis Commander**: http://localhost:8081
+
+📚 See [GETTING_STARTED.md](./GETTING_STARTED.md) for detailed setup instructions.
 
 ## 🏗️ Current Status
 
@@ -228,10 +254,6 @@ By building this project, you'll gain hands-on experience with:
 - ✅ Security and anti-cheat mechanisms
 - ✅ AWS deployment and infrastructure
 
-## �📝 License
-
-MIT
-
 ## 👤 Author
 
-Built as a portfolio project to demonstrate system design skills for technical recruiting.
+Erce Ozmetin

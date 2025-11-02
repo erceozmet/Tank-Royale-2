@@ -13,6 +13,7 @@ import leaderboardRoutes from './routes/leaderboard';
 import usersRoutes from './routes/users';
 import matchmakingRoutes from './routes/matchmaking';
 import { authenticate } from './middleware/auth';
+import { metricsMiddleware, metricsHandler } from './middleware/metrics';
 
 // Load environment variables
 dotenv.config({ path: '../.env.local' });
@@ -42,6 +43,10 @@ app.use(helmet()); // Security headers
 app.use(cors()); // Enable CORS
 app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
+app.use(metricsMiddleware); // Prometheus metrics collection
+
+// Metrics endpoint (should be accessible without auth for Prometheus)
+app.get('/metrics', metricsHandler);
 
 // Health check endpoint
 app.get('/health', async (req, res) => {

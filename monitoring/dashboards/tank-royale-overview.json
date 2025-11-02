@@ -1,0 +1,200 @@
+{
+  "id": null,
+  "uid": "tank-royale-overview",
+  "title": "Tank Royale 2 - System Overview",
+  "tags": ["tank-royale", "monitoring"],
+  "timezone": "browser",
+  "schemaVersion": 16,
+  "version": 0,
+  "refresh": "10s",
+  "panels": [
+      {
+        "id": 1,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "type": "graph",
+        "title": "HTTP Request Rate",
+        "targets": [
+          {
+            "expr": "rate(tank_royale_http_requests_total[5m])",
+            "legendFormat": "{{method}} {{route}} - {{status_code}}"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "type": "graph",
+        "title": "HTTP Request Duration (p95)",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(tank_royale_http_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{method}} {{route}}"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "gridPos": {"h": 6, "w": 6, "x": 0, "y": 8},
+        "type": "stat",
+        "title": "Active WebSocket Connections",
+        "targets": [
+          {
+            "expr": "tank_royale_websocket_connections"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "gridPos": {"h": 6, "w": 6, "x": 6, "y": 8},
+        "type": "stat",
+        "title": "Matchmaking Queue Size",
+        "targets": [
+          {
+            "expr": "tank_royale_matchmaking_queue_size"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "gridPos": {"h": 6, "w": 6, "x": 12, "y": 8},
+        "type": "stat",
+        "title": "Active Matches",
+        "targets": [
+          {
+            "expr": "tank_royale_active_matches"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "gridPos": {"h": 6, "w": 6, "x": 18, "y": 8},
+        "type": "stat",
+        "title": "Matches Created (Total)",
+        "targets": [
+          {
+            "expr": "tank_royale_matches_created_total"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 14},
+        "type": "graph",
+        "title": "Authentication Attempts",
+        "targets": [
+          {
+            "expr": "rate(tank_royale_auth_attempts_total{result=\"success\"}[5m])",
+            "legendFormat": "Success"
+          },
+          {
+            "expr": "rate(tank_royale_auth_attempts_total{result=\"failure\"}[5m])",
+            "legendFormat": "Failure"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 14},
+        "type": "graph",
+        "title": "System Memory Usage",
+        "targets": [
+          {
+            "expr": "tank_royale_process_resident_memory_bytes / 1024 / 1024",
+            "legendFormat": "Memory (MB)"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 22},
+        "type": "graph",
+        "title": "CPU Usage",
+        "targets": [
+          {
+            "expr": "rate(tank_royale_process_cpu_user_seconds_total[5m]) * 100",
+            "legendFormat": "User CPU %"
+          },
+          {
+            "expr": "rate(tank_royale_process_cpu_system_seconds_total[5m]) * 100",
+            "legendFormat": "System CPU %"
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 22},
+        "type": "graph",
+        "title": "Event Loop Lag",
+        "targets": [
+          {
+            "expr": "tank_royale_nodejs_eventloop_lag_seconds",
+            "legendFormat": "Event Loop Lag (s)"
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 30},
+        "type": "graph",
+        "title": "Redis Operations",
+        "targets": [
+          {
+            "expr": "rate(redis_commands_processed_total[5m])",
+            "legendFormat": "Commands/sec"
+          }
+        ]
+      },
+      {
+        "id": 12,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 38},
+        "type": "graph",
+        "title": "Redis Memory Usage",
+        "targets": [
+          {
+            "expr": "redis_memory_used_bytes / 1024 / 1024",
+            "legendFormat": "Memory (MB)"
+          }
+        ]
+      },
+      {
+        "id": 13,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 38},
+        "type": "graph",
+        "title": "Redis Connected Clients",
+        "targets": [
+          {
+            "expr": "redis_connected_clients",
+            "legendFormat": "Clients"
+          }
+        ]
+      },
+      {
+        "id": 14,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 46},
+        "type": "graph",
+        "title": "PostgreSQL Connections",
+        "targets": [
+          {
+            "expr": "pg_stat_database_numbackends{datname=\"tank_royale\"}",
+            "legendFormat": "Active Connections"
+          }
+        ]
+      },
+      {
+        "id": 15,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 46},
+        "type": "graph",
+        "title": "PostgreSQL Transactions",
+        "targets": [
+          {
+            "expr": "rate(pg_stat_database_xact_commit{datname=\"tank_royale\"}[5m])",
+            "legendFormat": "Commits/sec"
+          },
+          {
+            "expr": "rate(pg_stat_database_xact_rollback{datname=\"tank_royale\"}[5m])",
+            "legendFormat": "Rollbacks/sec"
+          }
+        ]
+      }
+    ]
+  }
