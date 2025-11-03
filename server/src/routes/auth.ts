@@ -3,6 +3,7 @@ import { hashPassword, comparePassword, generateToken, isValidEmail, isValidUser
 import { authenticate } from '../middleware/auth';
 import { userRepository } from '../repositories';
 import { authAttempts } from '../middleware/metrics';
+import { RedisSessionManager } from '../db/redis';
 
 const router = Router();
 
@@ -50,6 +51,13 @@ router.post('/register', async (req: Request, res: Response) => {
 
     // Generate JWT token
     const token = generateToken(user.userId, user.username);
+
+    // Create Redis session for WebSocket authentication
+    await RedisSessionManager.setSession(user.userId, {
+      username: user.username,
+      email: user.email,
+      registrationTime: new Date().toISOString(),
+    });
 
     // Track successful authentication
     authAttempts.labels('success').inc();
@@ -104,6 +112,13 @@ router.post('/login', async (req: Request, res: Response) => {
 
     // Generate JWT token
     const token = generateToken(user.userId, user.username);
+
+    // Create Redis session for WebSocket authentication
+    await RedisSessionManager.setSession(user.userId, {
+      username: user.username,
+      email: user.email,
+      loginTime: new Date().toISOString(),
+    });
 
     // Track successful authentication
     authAttempts.labels('success').inc();
