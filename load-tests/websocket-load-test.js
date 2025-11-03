@@ -24,11 +24,11 @@ const CONFIG = {
 
 // Test users pool (5 users, will be reused)
 const TEST_USERS = [
-  { email: 'loadtest1@test.com', password: 'LoadTest123!' },
-  { email: 'loadtest2@test.com', password: 'LoadTest123!' },
-  { email: 'loadtest3@test.com', password: 'LoadTest123!' },
-  { email: 'loadtest4@test.com', password: 'LoadTest123!' },
-  { email: 'loadtest5@test.com', password: 'LoadTest123!' },
+  { email: 'loadtest1@test.com', password: 'TestPassword123!' },
+  { email: 'loadtest2@test.com', password: 'TestPassword123!' },
+  { email: 'loadtest3@test.com', password: 'TestPassword123!' },
+  { email: 'loadtest4@test.com', password: 'TestPassword123!' },
+  { email: 'loadtest5@test.com', password: 'TestPassword123!' },
 ];
 
 // Metrics

@@ -69,7 +69,7 @@ export class UserRepository {
    */
   async usernameExists(username: string): Promise<boolean> {
     const result = await query(userQueries.usernameExists, [username]);
-    return result.rows.length > 0;
+    return result.rows[0]?.exists || false;
   }
 
   /**
@@ -77,7 +77,7 @@ export class UserRepository {
    */
   async emailExists(email: string): Promise<boolean> {
     const result = await query(userQueries.emailExists, [email]);
-    return result.rows.length > 0;
+    return result.rows[0]?.exists || false;
   }
 
   /**
@@ -85,7 +85,7 @@ export class UserRepository {
    */
   async usernameOrEmailExists(username: string, email: string): Promise<boolean> {
     const result = await query(userQueries.usernameOrEmailExists, [username, email]);
-    return result.rows.length > 0;
+    return result.rows[0]?.exists || false;
   }
 
   /**
