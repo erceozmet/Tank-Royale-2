@@ -3,10 +3,22 @@ global:
   evaluation_interval: 15s
 
 scrape_configs:
-  # Node.js application metrics
-  - job_name: 'tank-royale-server'
+  # Go API Server metrics
+  - job_name: 'tank-royale-api'
     static_configs:
-      - targets: ['host.containers.internal:3000']
+      - targets: ['localhost:8080']
+    metrics_path: '/metrics'
+
+  # Go Game Server metrics
+  - job_name: 'tank-royale-game'
+    static_configs:
+      - targets: ['localhost:8081']
+    metrics_path: '/metrics'
+  
+  # Legacy Node.js server (if running)
+  - job_name: 'tank-royale-server-legacy'
+    static_configs:
+      - targets: ['localhost:3000']
     metrics_path: '/metrics'
 
   # Redis metrics
