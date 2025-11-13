@@ -73,7 +73,11 @@ else
         podman run -d \
             --name tank-redis \
             -p 6379:6379 \
-            redis:7-alpine
+            redis:7-alpine \
+            redis-server \
+            --appendonly yes \
+            --maxmemory 512mb \
+            --maxmemory-policy allkeys-lru
     }
     wait_for_service localhost 6379 "Redis"
 fi
@@ -150,8 +154,10 @@ else
         echo "⚠️  pgAdmin container not found, creating new one..."
         podman run -d \
             --name tank-pgadmin \
-            -e PGADMIN_DEFAULT_EMAIL=admin@admin.com \
+            -e PGADMIN_DEFAULT_EMAIL=admin@tankroyale.com \
             -e PGADMIN_DEFAULT_PASSWORD=admin \
+            -e PGADMIN_CONFIG_SERVER_MODE=False \
+            -e PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED=False \
             -p 5050:80 \
             dpage/pgadmin4:latest
     }
