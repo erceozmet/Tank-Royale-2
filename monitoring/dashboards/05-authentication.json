@@ -1,0 +1,256 @@
+{
+  "id": null,
+  "uid": "tank-authentication",
+  "title": "Tank Royale - Authentication",
+  "tags": ["tank-royale", "auth", "security"],
+  "timezone": "browser",
+  "schemaVersion": 16,
+  "version": 1,
+  "refresh": "10s",
+  "panels": [
+    {
+      "id": 1,
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 0},
+      "type": "timeseries",
+      "title": "Authentication Attempts Over Time",
+      "targets": [
+        {
+          "expr": "sum by (status) (rate(auth_attempts_total[1m])) * 60",
+          "legendFormat": "{{status}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "showPoints": "never",
+            "stacking": {"mode": "normal"}
+          },
+          "unit": "reqpm"
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "success"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "failure"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 0},
+      "type": "timeseries",
+      "title": "Auth Success Rate (%)",
+      "targets": [
+        {
+          "expr": "(sum(rate(auth_attempts_total{status=\"success\"}[5m])) / sum(rate(auth_attempts_total[5m]))) * 100",
+          "legendFormat": "Success Rate",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 3,
+            "fillOpacity": 20,
+            "showPoints": "never"
+          },
+          "color": {"mode": "fixed", "fixedColor": "green"},
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 9},
+      "type": "timeseries",
+      "title": "Authentication Endpoints - Request Rate",
+      "targets": [
+        {
+          "expr": "sum by (endpoint) (rate(http_requests_total{endpoint=~\"/api/auth/.*\"}[1m]))",
+          "legendFormat": "{{endpoint}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "reqps"
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": ["mean", "lastNotNull", "max"]
+        }
+      }
+    },
+    {
+      "id": 4,
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 9},
+      "type": "timeseries",
+      "title": "Authentication Endpoints - Response Time (p95)",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (endpoint, le) (rate(http_request_duration_seconds_bucket{endpoint=~\"/api/auth/.*\"}[5m])))",
+          "legendFormat": "{{endpoint}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never"
+          },
+          "unit": "s"
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": ["mean", "lastNotNull", "max"]
+        }
+      }
+    },
+    {
+      "id": 5,
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 18},
+      "type": "stat",
+      "title": "Total Auth Attempts",
+      "targets": [
+        {
+          "expr": "sum(auth_attempts_total)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "fixed", "fixedColor": "blue"},
+          "unit": "short"
+        }
+      },
+      "options": {
+        "textMode": "value_and_name",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 6,
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 18},
+      "type": "stat",
+      "title": "Successful Logins",
+      "targets": [
+        {
+          "expr": "auth_attempts_total{status=\"success\"}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "fixed", "fixedColor": "green"},
+          "unit": "short"
+        }
+      },
+      "options": {
+        "textMode": "value_and_name",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 7,
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 18},
+      "type": "stat",
+      "title": "Failed Attempts",
+      "targets": [
+        {
+          "expr": "auth_attempts_total{status=\"failure\"}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "green"},
+              {"value": 10, "color": "yellow"},
+              {"value": 50, "color": "red"}
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "options": {
+        "textMode": "value_and_name",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 8,
+      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 18},
+      "type": "stat",
+      "title": "Current Success Rate",
+      "targets": [
+        {
+          "expr": "(sum(rate(auth_attempts_total{status=\"success\"}[5m])) / sum(rate(auth_attempts_total[5m]))) * 100",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "red"},
+              {"value": 70, "color": "yellow"},
+              {"value": 90, "color": "green"}
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "options": {
+        "textMode": "value_and_name",
+        "graphMode": "area"
+      }
+    }
+  ]
+}

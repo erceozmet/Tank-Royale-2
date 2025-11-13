@@ -1,0 +1,297 @@
+{
+  "id": null,
+  "uid": "tank-database",
+  "title": "Tank Royale - Database",
+  "tags": ["tank-royale", "database", "postgresql"],
+  "timezone": "browser",
+  "schemaVersion": 16,
+  "version": 1,
+  "refresh": "10s",
+  "panels": [
+    {
+      "id": 1,
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "type": "timeseries",
+      "title": "Database Connections Over Time",
+      "targets": [
+        {
+          "expr": "db_connections_active",
+          "legendFormat": "Active (Executing Queries)",
+          "refId": "A"
+        },
+        {
+          "expr": "db_connections_idle",
+          "legendFormat": "Idle (Pool)",
+          "refId": "B"
+        },
+        {
+          "expr": "db_connections_total",
+          "legendFormat": "Total",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "Active (Executing Queries)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}},
+              {"id": "custom.fillOpacity", "value": 30}
+            ]
+          },
+          {
+            "matcher": {"id": "byName", "options": "Idle (Pool)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}},
+              {"id": "custom.fillOpacity", "value": 5}
+            ]
+          },
+          {
+            "matcher": {"id": "byName", "options": "Total"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}},
+              {"id": "custom.lineWidth", "value": 1},
+              {"id": "custom.fillOpacity", "value": 0}
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "type": "timeseries",
+      "title": "Query Rate by Type",
+      "targets": [
+        {
+          "expr": "sum by (query_type) (rate(db_query_duration_seconds_count[1m]))",
+          "legendFormat": "{{query_type}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "qps"
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": ["mean", "lastNotNull", "max"]
+        }
+      }
+    },
+    {
+      "id": 3,
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 8},
+      "type": "timeseries",
+      "title": "Query Latency - All Queries (p50, p95, p99)",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(db_query_duration_seconds_bucket[5m])))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(db_query_duration_seconds_bucket[5m])))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(db_query_duration_seconds_bucket[5m])))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never"
+          },
+          "unit": "s"
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "p50"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "p95"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "p99"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 8},
+      "type": "timeseries",
+      "title": "Query Latency by Type (p95)",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (query_type, le) (rate(db_query_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{query_type}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never"
+          },
+          "unit": "s"
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": ["mean", "lastNotNull", "max"]
+        }
+      }
+    },
+    {
+      "id": 5,
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 17},
+      "type": "stat",
+      "title": "Active Connections",
+      "targets": [
+        {
+          "expr": "db_connections_active",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "green"},
+              {"value": 10, "color": "yellow"},
+              {"value": 20, "color": "red"}
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "options": {
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 6,
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 17},
+      "type": "stat",
+      "title": "Idle Connections (Pool)",
+      "targets": [
+        {
+          "expr": "db_connections_idle",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "fixed", "fixedColor": "blue"},
+          "unit": "short"
+        }
+      },
+      "options": {
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 7,
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 17},
+      "type": "stat",
+      "title": "Total Connections",
+      "targets": [
+        {
+          "expr": "db_connections_total",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "green"},
+              {"value": 20, "color": "yellow"},
+              {"value": 25, "color": "red"}
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "options": {
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 8,
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 17},
+      "type": "stat",
+      "title": "Queries/sec",
+      "targets": [
+        {
+          "expr": "sum(rate(db_query_duration_seconds_count[1m]))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "fixed", "fixedColor": "blue"},
+          "unit": "qps"
+        }
+      },
+      "options": {
+        "textMode": "value_and_name"
+      }
+    }
+  ]
+}

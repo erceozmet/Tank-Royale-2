@@ -9,10 +9,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/erceozmet/tank-royale-2/go-server/internal/auth"
+	"github.com/erceozmet/tank-royale-2/go-server/internal/cache"
 	"github.com/erceozmet/tank-royale-2/go-server/internal/config"
 	"github.com/erceozmet/tank-royale-2/go-server/internal/db/postgres"
 	"github.com/erceozmet/tank-royale-2/go-server/internal/db/redis"
+	"github.com/erceozmet/tank-royale-2/go-server/internal/handlers"
 	appMiddleware "github.com/erceozmet/tank-royale-2/go-server/internal/middleware"
+	"github.com/erceozmet/tank-royale-2/go-server/internal/repositories"
 	"github.com/erceozmet/tank-royale-2/go-server/pkg/logger"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -38,6 +42,10 @@ func main() {
 	logger.Init(cfg.Logging.Level, cfg.Logging.Format)
 	logger.Logger.Info().Msg("Starting Tank Royale API Server")
 
+	// Set JWT secret from config
+	auth.SetJWTSecret(cfg.JWT.Secret)
+	logger.Logger.Info().Msg("JWT secret configured")
+
 	// Connect to PostgreSQL
 	logger.Logger.Info().Msg("Connecting to PostgreSQL...")
 	pgDB, err := postgres.Connect(cfg.Database.Postgres)
@@ -55,6 +63,15 @@ func main() {
 	}
 	defer redisDB.Close()
 	logger.Logger.Info().Msg("Connected to Redis")
+
+	// Initialize repositories
+	userRepo := repositories.NewUserRepository(pgDB, redisDB)
+
+	// Initialize session manager
+	sessionManager := cache.NewSessionManager(redisDB.Client)
+
+	// Initialize handlers
+	authHandler := handlers.NewAuthHandler(userRepo, sessionManager)
 
 	// Initialize router
 	r := chi.NewRouter()
@@ -80,19 +97,19 @@ func main() {
 	// Health check endpoint
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		
+
 		// Check database health
 		pgHealth := pgDB.Health() == nil
 		redisHealth := redisDB.Health() == nil
-		
+
 		status := "healthy"
 		httpStatus := http.StatusOK
-		
+
 		if !pgHealth || !redisHealth {
 			status = "unhealthy"
 			httpStatus = http.StatusServiceUnavailable
 		}
-		
+
 		w.WriteHeader(httpStatus)
 		fmt.Fprintf(w, `{
 			"status": "%s",
@@ -123,46 +140,37 @@ func main() {
 		// Test database query endpoint for metrics demonstration
 		r.Get("/test/db", func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
-			
+
 			// Test PostgreSQL query
 			var count int
 			pgErr := pgDB.Pool.QueryRow(r.Context(), "SELECT COUNT(*) FROM users").Scan(&count)
 			pgDB.RecordQuery("test_count_users", time.Since(start))
-			
+
 			// Test Redis operation
 			redisStart := time.Now()
 			redisErr := redisDB.Client.Set(r.Context(), "test:ping", "pong", 10*time.Second).Err()
 			redisDB.RecordQuery("test_set", time.Since(redisStart))
-			
+
 			w.Header().Set("Content-Type", "application/json")
 			if pgErr != nil || redisErr != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				fmt.Fprintf(w, `{"error": "Database error", "postgres": "%v", "redis": "%v"}`, pgErr, redisErr)
 				return
 			}
-			
+
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintf(w, `{"status": "ok", "postgres_users": %d, "redis": "ok"}`, count)
 		})
 
-		// Auth routes (TODO: implement in Phase 2)
+		// Auth routes
 		r.Route("/auth", func(r chi.Router) {
-			r.Post("/register", func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusNotImplemented)
-				fmt.Fprint(w, `{"error": "Not implemented yet"}`)
-			})
-			
-			r.Post("/login", func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusNotImplemented)
-				fmt.Fprint(w, `{"error": "Not implemented yet"}`)
-			})
-			
-			r.Get("/me", func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusNotImplemented)
-				fmt.Fprint(w, `{"error": "Not implemented yet"}`)
+			r.Post("/register", authHandler.Register)
+			r.Post("/login", authHandler.Login)
+
+			// Protected routes
+			r.Group(func(r chi.Router) {
+				r.Use(appMiddleware.AuthMiddleware)
+				r.Get("/me", authHandler.Me)
 			})
 		})
 
@@ -200,7 +208,7 @@ func main() {
 		logger.Logger.Info().
 			Str("address", addr).
 			Msg("API server listening")
-		
+
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Logger.Fatal().Err(err).Msg("Server failed to start")
 		}
@@ -210,7 +218,7 @@ func main() {
 	go func() {
 		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()
-		
+
 		for {
 			select {
 			case <-ticker.C:

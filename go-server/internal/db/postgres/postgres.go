@@ -21,7 +21,7 @@ func Connect(cfg config.PostgresConfig) (*DB, error) {
 	defer cancel()
 
 	connStr := cfg.ConnectionString()
-	
+
 	poolConfig, err := pgxpool.ParseConfig(connStr)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse connection string: %w", err)
@@ -64,7 +64,12 @@ func (db *DB) Health() error {
 func (db *DB) UpdatePoolMetrics() {
 	if db.Pool != nil {
 		stat := db.Pool.Stat()
+		// Active connections = connections currently executing queries
 		metrics.DBConnectionsActive.Set(float64(stat.AcquiredConns()))
+		// Idle connections = connections in pool but not in use
+		metrics.DBConnectionsIdle.Set(float64(stat.IdleConns()))
+		// Total connections = active + idle
+		metrics.DBConnectionsTotal.Set(float64(stat.TotalConns()))
 	}
 }
 

@@ -1,0 +1,297 @@
+{
+  "id": null,
+  "uid": "tank-system-resources",
+  "title": "Tank Royale - System Resources",
+  "tags": ["tank-royale", "system", "resources"],
+  "timezone": "browser",
+  "schemaVersion": 16,
+  "version": 1,
+  "refresh": "10s",
+  "panels": [
+    {
+      "id": 1,
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "type": "timeseries",
+      "title": "Memory Usage",
+      "targets": [
+        {
+          "expr": "process_resident_memory_bytes / 1024 / 1024",
+          "legendFormat": "Resident Memory (MB)",
+          "refId": "A"
+        },
+        {
+          "expr": "go_memstats_alloc_bytes / 1024 / 1024",
+          "legendFormat": "Go Heap Alloc (MB)",
+          "refId": "B"
+        },
+        {
+          "expr": "go_memstats_sys_bytes / 1024 / 1024",
+          "legendFormat": "Go System (MB)",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "decmbytes",
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "Resident Memory (MB)"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "Go Heap Alloc (MB)"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "Go System (MB)"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}}]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "type": "timeseries",
+      "title": "CPU Usage",
+      "targets": [
+        {
+          "expr": "rate(process_cpu_seconds_total[1m]) * 100",
+          "legendFormat": "CPU %",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 20,
+            "showPoints": "never"
+          },
+          "color": {"mode": "fixed", "fixedColor": "red"},
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "type": "timeseries",
+      "title": "Active Goroutines",
+      "targets": [
+        {
+          "expr": "goroutines_active",
+          "legendFormat": "Goroutines",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 20,
+            "showPoints": "never"
+          },
+          "color": {"mode": "fixed", "fixedColor": "purple"},
+          "unit": "short",
+          "min": 0
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "type": "timeseries",
+      "title": "Garbage Collection",
+      "targets": [
+        {
+          "expr": "rate(go_gc_duration_seconds_count[1m])",
+          "legendFormat": "GC/sec",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(go_gc_duration_seconds_sum[1m]) * 1000",
+          "legendFormat": "GC Time (ms/sec)",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "GC/sec"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "GC Time (ms/sec)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}},
+              {"id": "unit", "value": "ms"}
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 16},
+      "type": "stat",
+      "title": "Memory (Resident)",
+      "targets": [
+        {
+          "expr": "process_resident_memory_bytes / 1024 / 1024",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "green"},
+              {"value": 100, "color": "yellow"},
+              {"value": 500, "color": "red"}
+            ]
+          },
+          "unit": "decmbytes"
+        }
+      },
+      "options": {
+        "textMode": "value_and_name",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 6,
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 16},
+      "type": "stat",
+      "title": "Go Heap",
+      "targets": [
+        {
+          "expr": "go_memstats_alloc_bytes / 1024 / 1024",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "fixed", "fixedColor": "green"},
+          "unit": "decmbytes"
+        }
+      },
+      "options": {
+        "textMode": "value_and_name",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 7,
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 16},
+      "type": "stat",
+      "title": "CPU Usage",
+      "targets": [
+        {
+          "expr": "rate(process_cpu_seconds_total[1m]) * 100",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "green"},
+              {"value": 50, "color": "yellow"},
+              {"value": 80, "color": "red"}
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "options": {
+        "textMode": "value_and_name",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 8,
+      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 16},
+      "type": "stat",
+      "title": "Goroutines",
+      "targets": [
+        {
+          "expr": "goroutines_active",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "green"},
+              {"value": 100, "color": "yellow"},
+              {"value": 500, "color": "red"}
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "options": {
+        "textMode": "value_and_name",
+        "graphMode": "area"
+      }
+    }
+  ]
+}

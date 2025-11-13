@@ -1,0 +1,163 @@
+{
+  "id": null,
+  "uid": "tank-http-api",
+  "title": "Tank Royale - HTTP API",
+  "tags": ["tank-royale", "http", "api"],
+  "timezone": "browser",
+  "schemaVersion": 16,
+  "version": 1,
+  "refresh": "10s",
+  "panels": [
+    {
+      "id": 1,
+      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 0},
+      "type": "timeseries",
+      "title": "HTTP Request Rate by Endpoint",
+      "targets": [
+        {
+          "expr": "sum by (endpoint, method) (rate(http_requests_total{endpoint!~\"/(metrics|health)\"}[1m]))",
+          "legendFormat": "{{method}} {{endpoint}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "reqps"
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": ["mean", "lastNotNull", "max"]
+        }
+      }
+    },
+    {
+      "id": 2,
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 9},
+      "type": "timeseries",
+      "title": "HTTP Response Latency (p50, p95, p99)",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(http_request_duration_seconds_bucket{endpoint!~\"/(metrics|health)\"}[5m])))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{endpoint!~\"/(metrics|health)\"}[5m])))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{endpoint!~\"/(metrics|health)\"}[5m])))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never"
+          },
+          "unit": "s"
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 9},
+      "type": "timeseries",
+      "title": "HTTP Status Code Distribution",
+      "targets": [
+        {
+          "expr": "sum by (status) (rate(http_requests_total{endpoint!~\"/(metrics|health)\"}[1m]))",
+          "legendFormat": "{{status}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "stacking": {"mode": "normal"}
+          },
+          "unit": "reqps"
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byRegexp", "options": "2.."},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]
+          },
+          {
+            "matcher": {"id": "byRegexp", "options": "4.."},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}}]
+          },
+          {
+            "matcher": {"id": "byRegexp", "options": "5.."},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 18},
+      "type": "timeseries",
+      "title": "Request Latency by Endpoint",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (endpoint, method, le) (rate(http_request_duration_seconds_bucket{endpoint!~\"/(metrics|health)\"}[5m])))",
+          "legendFormat": "{{method}} {{endpoint}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never"
+          },
+          "unit": "s"
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": ["mean", "lastNotNull", "max"]
+        }
+      }
+    }
+  ]
+}

@@ -8,7 +8,8 @@ import (
 
 	"github.com/erceozmet/tank-royale-2/go-server/internal/cache"
 	"github.com/erceozmet/tank-royale-2/go-server/internal/config"
-	"github.com/erceozmet/tank-royale-2/go-server/internal/db/redis"
+	redisdb "github.com/erceozmet/tank-royale-2/go-server/internal/db/redis"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -22,7 +23,7 @@ func main() {
 	}
 
 	// Connect to Redis
-	redisDB, err := redis.Connect(cfg.Database.Redis)
+	redisDB, err := redisdb.Connect(cfg.Database.Redis)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -89,12 +90,16 @@ func main() {
 		fmt.Printf("   ✅ Lobby created with safety TTL: %v (%.0f hours)\n", ttl, ttl.Hours())
 	}
 
-	fmt.Println("\n6️⃣  Testing Leaderboard (No TTL - Persistent)")
-	if err := redisCache.UpdateLeaderboardWins(ctx, "user123", 25); err != nil {
+	fmt.Println("\n6️⃣  Testing Leaderboard (5 min TTL - Cache)")
+	leaderboardEntries := []redis.Z{
+		{Score: 25, Member: "user123"},
+		{Score: 30, Member: "user456"},
+	}
+	if err := redisCache.CacheLeaderboard(ctx, "wins", leaderboardEntries); err != nil {
 		log.Printf("Error: %v", err)
 	} else {
 		ttl, _ := redisDB.Client.TTL(ctx, "leaderboard:wins").Result()
-		fmt.Printf("   ✅ Leaderboard updated, TTL: %v (persistent)\n", ttl)
+		fmt.Printf("   ✅ Leaderboard cached, TTL: %v (%.0f minutes)\n", ttl, ttl.Minutes())
 	}
 
 	fmt.Println("\n7️⃣  Testing Token Blacklist (Custom TTL)")

@@ -1,0 +1,275 @@
+{
+  "id": null,
+  "uid": "tank-internal-admin",
+  "title": "Tank Royale - Internal & Admin",
+  "tags": ["tank-royale", "admin", "internal"],
+  "timezone": "browser",
+  "schemaVersion": 16,
+  "version": 1,
+  "refresh": "10s",
+  "panels": [
+    {
+      "id": 1,
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 0},
+      "type": "timeseries",
+      "title": "Internal Endpoints - Request Rate",
+      "targets": [
+        {
+          "expr": "sum by (endpoint) (rate(http_requests_total{endpoint=~\"/(metrics|health)\"}[1m]))",
+          "legendFormat": "{{endpoint}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "reqps"
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "/metrics"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "/health"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": ["mean", "lastNotNull", "max"]
+        }
+      }
+    },
+    {
+      "id": 2,
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 0},
+      "type": "timeseries",
+      "title": "Internal Endpoints - Response Time",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (endpoint, le) (rate(http_request_duration_seconds_bucket{endpoint=~\"/(metrics|health)\"}[5m])))",
+          "legendFormat": "{{endpoint}} (p95)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never"
+          },
+          "unit": "s"
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 9},
+      "type": "timeseries",
+      "title": "Prometheus Scrape Rate",
+      "targets": [
+        {
+          "expr": "rate(http_requests_total{endpoint=\"/metrics\"}[5m])",
+          "legendFormat": "Scrapes/sec",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "showPoints": "never"
+          },
+          "color": {"mode": "fixed", "fixedColor": "blue"},
+          "unit": "reqps"
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 9},
+      "type": "timeseries",
+      "title": "Health Check Response Time",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{endpoint=\"/health\"}[5m]))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{endpoint=\"/health\"}[5m]))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{endpoint=\"/health\"}[5m]))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never"
+          },
+          "unit": "s"
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "p50"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "p95"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "p99"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 18},
+      "type": "stat",
+      "title": "Metrics Endpoint Hits",
+      "targets": [
+        {
+          "expr": "http_requests_total{endpoint=\"/metrics\"}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "fixed", "fixedColor": "blue"},
+          "unit": "short"
+        }
+      },
+      "options": {
+        "textMode": "value_and_name",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 6,
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 18},
+      "type": "stat",
+      "title": "Health Check Hits",
+      "targets": [
+        {
+          "expr": "http_requests_total{endpoint=\"/health\"}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "fixed", "fixedColor": "green"},
+          "unit": "short"
+        }
+      },
+      "options": {
+        "textMode": "value_and_name",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 7,
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 18},
+      "type": "stat",
+      "title": "Avg Scrape Interval",
+      "targets": [
+        {
+          "expr": "1 / rate(http_requests_total{endpoint=\"/metrics\"}[5m])",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "fixed", "fixedColor": "blue"},
+          "unit": "s",
+          "decimals": 1
+        }
+      },
+      "options": {
+        "textMode": "value_and_name",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 8,
+      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 18},
+      "type": "stat",
+      "title": "Health Check Status",
+      "targets": [
+        {
+          "expr": "http_requests_total{endpoint=\"/health\",status=\"200\"} > 0",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "1": {"text": "Healthy", "color": "green"}
+              }
+            },
+            {
+              "type": "special",
+              "options": {
+                "match": "null",
+                "result": {"text": "Unknown", "color": "red"}
+              }
+            }
+          ],
+          "noValue": "Unhealthy"
+        }
+      },
+      "options": {
+        "textMode": "value",
+        "graphMode": "none"
+      }
+    }
+  ]
+}

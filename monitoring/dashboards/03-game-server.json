@@ -1,0 +1,232 @@
+{
+  "id": null,
+  "uid": "tank-game-server",
+  "title": "Tank Royale - Game Server",
+  "tags": ["tank-royale", "game", "websocket"],
+  "timezone": "browser",
+  "schemaVersion": 16,
+  "version": 1,
+  "refresh": "5s",
+  "panels": [
+    {
+      "id": 1,
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "type": "timeseries",
+      "title": "Active Players Over Time",
+      "targets": [
+        {
+          "expr": "game_players_active",
+          "legendFormat": "Players",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 3,
+            "fillOpacity": 20,
+            "showPoints": "never"
+          },
+          "color": {"mode": "fixed", "fixedColor": "blue"},
+          "unit": "short",
+          "min": 0
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "type": "timeseries",
+      "title": "Active Game Rooms Over Time",
+      "targets": [
+        {
+          "expr": "game_rooms_active",
+          "legendFormat": "Rooms",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 3,
+            "fillOpacity": 20,
+            "showPoints": "never"
+          },
+          "color": {"mode": "fixed", "fixedColor": "green"},
+          "unit": "short",
+          "min": 0
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "type": "timeseries",
+      "title": "WebSocket Connections",
+      "targets": [
+        {
+          "expr": "websocket_connections_active",
+          "legendFormat": "Active Connections",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 3,
+            "fillOpacity": 20,
+            "showPoints": "never"
+          },
+          "color": {"mode": "fixed", "fixedColor": "purple"},
+          "unit": "short",
+          "min": 0
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "type": "timeseries",
+      "title": "Total Games Played (Cumulative)",
+      "targets": [
+        {
+          "expr": "games_total",
+          "legendFormat": "Games",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "color": {"mode": "fixed", "fixedColor": "orange"},
+          "unit": "short",
+          "min": 0
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 16},
+      "type": "stat",
+      "title": "Active Players",
+      "targets": [
+        {
+          "expr": "game_players_active",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "fixed", "fixedColor": "blue"},
+          "unit": "short"
+        }
+      },
+      "options": {
+        "textMode": "value_and_name",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 6,
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 16},
+      "type": "stat",
+      "title": "Active Game Rooms",
+      "targets": [
+        {
+          "expr": "game_rooms_active",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "fixed", "fixedColor": "green"},
+          "unit": "short"
+        }
+      },
+      "options": {
+        "textMode": "value_and_name",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 7,
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 16},
+      "type": "stat",
+      "title": "WebSocket Connections",
+      "targets": [
+        {
+          "expr": "websocket_connections_active",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "fixed", "fixedColor": "purple"},
+          "unit": "short"
+        }
+      },
+      "options": {
+        "textMode": "value_and_name",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 8,
+      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 16},
+      "type": "stat",
+      "title": "Total Games Played",
+      "targets": [
+        {
+          "expr": "games_total",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "fixed", "fixedColor": "orange"},
+          "unit": "short"
+        }
+      },
+      "options": {
+        "textMode": "value_and_name",
+        "graphMode": "area"
+      }
+    }
+  ]
+}

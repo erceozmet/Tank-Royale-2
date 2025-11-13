@@ -28,7 +28,21 @@ var (
 	DBConnectionsActive = promauto.NewGauge(
 		prometheus.GaugeOpts{
 			Name: "db_connections_active",
-			Help: "Number of active database connections",
+			Help: "Number of active database connections (executing queries)",
+		},
+	)
+
+	DBConnectionsIdle = promauto.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "db_connections_idle",
+			Help: "Number of idle database connections in pool",
+		},
+	)
+
+	DBConnectionsTotal = promauto.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "db_connections_total",
+			Help: "Total number of database connections (active + idle)",
 		},
 	)
 
@@ -101,5 +115,40 @@ var (
 			Name: "goroutines_active",
 			Help: "Number of active goroutines",
 		},
+	)
+
+	// Authentication Metrics
+	AuthAttempts = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "auth_attempts_total",
+			Help: "Total number of authentication attempts",
+		},
+		[]string{"status"}, // success or failure
+	)
+
+	// Cache Metrics
+	CacheHits = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "cache_hits_total",
+			Help: "Total number of cache hits",
+		},
+		[]string{"cache_type"}, // user, session, leaderboard, etc.
+	)
+
+	CacheMisses = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "cache_misses_total",
+			Help: "Total number of cache misses",
+		},
+		[]string{"cache_type"},
+	)
+
+	CacheOperationDuration = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "cache_operation_duration_seconds",
+			Help:    "Duration of cache operations in seconds",
+			Buckets: []float64{.001, .005, .01, .025, .05, .1},
+		},
+		[]string{"operation", "cache_type"}, // get, set, delete
 	)
 )

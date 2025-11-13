@@ -19,9 +19,6 @@ var (
 
 	// Username validation regex (3-50 alphanumeric characters or underscores)
 	usernameRegex = regexp.MustCompile(`^[a-zA-Z0-9_]{3,50}$`)
-
-	// Password validation regex (at least 1 uppercase, 1 lowercase, 1 number)
-	passwordRegex = regexp.MustCompile(`^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$`)
 )
 
 // JWTClaims represents the JWT token claims
@@ -110,5 +107,26 @@ func IsValidUsername(username string) bool {
 // IsValidPassword validates a password
 // Must be at least 8 characters with 1 uppercase, 1 lowercase, and 1 number
 func IsValidPassword(password string) bool {
-	return passwordRegex.MatchString(password)
+	if len(password) < 8 {
+		return false
+	}
+
+	var (
+		hasUpper  bool
+		hasLower  bool
+		hasNumber bool
+	)
+
+	for _, char := range password {
+		switch {
+		case char >= 'A' && char <= 'Z':
+			hasUpper = true
+		case char >= 'a' && char <= 'z':
+			hasLower = true
+		case char >= '0' && char <= '9':
+			hasNumber = true
+		}
+	}
+
+	return hasUpper && hasLower && hasNumber
 }
