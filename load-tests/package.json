@@ -3,16 +3,20 @@
   "version": "1.0.0",
   "description": "Load testing suite for Tank Royale 2",
   "scripts": {
+    "preflight": "node preflight-check.js",
     "setup": "node setup.js",
     "test:api": "artillery run api-load-test.yml",
     "test:websocket": "node websocket-load-test.js",
     "test:matchmaking": "node matchmaking-load-test.js",
-    "test:all": "npm run setup && npm run test:api && npm run test:websocket && npm run test:matchmaking",
-    "test:quick": "NUM_CLIENTS=50 NUM_PLAYERS=100 TEST_DURATION=30 npm run test:websocket && npm run test:matchmaking"
+    "test:gameloop": "node game-loop-load-test.js",
+    "test:all": "npm run preflight && npm run test:api && npm run test:websocket && npm run test:matchmaking && npm run test:gameloop",
+    "test:quick": "NUM_CLIENTS=50 NUM_PLAYERS=100 TEST_DURATION=30 npm run test:websocket && npm run test:matchmaking",
+    "test:game-quick": "NUM_PLAYERS=16 TEST_DURATION=60 npm run test:gameloop"
   },
   "dependencies": {
     "axios": "^1.6.0",
-    "socket.io-client": "^4.6.1"
+    "socket.io-client": "^4.6.1",
+    "ws": "^8.14.0"
   },
   "devDependencies": {
     "artillery": "^2.0.0"

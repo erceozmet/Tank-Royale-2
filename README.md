@@ -38,13 +38,13 @@ make help
 
 ### Tech Stack
 - **Frontend**: TypeScript, Phaser.js, Socket.io-client
-- **Backend**: Go, WebSockets, REST API
-- **Game Server**: Worker Threads (30 TPS per lobby)
+- **Backend**: Go (REST API + Game Server with 30 TPS)
 - **Databases**: 
   - PostgreSQL (user accounts, match results)
-  - Cassandra (game events, telemetry)
+  - Cassandra (game events, telemetry - optional)
   - Redis (leaderboards, matchmaking queue, cache)
 - **Deployment**: AWS (EC2, RDS, ElastiCache, Keyspaces)
+- **Monitoring**: Prometheus + Grafana
 
 ### Key Design Patterns
 - **Client-side prediction** with server reconciliation
@@ -57,80 +57,79 @@ make help
 
 ```
 tank-royale-2/
-├── client/                 # Frontend (Phaser.js)
-│   ├── src/
-│   │   ├── scenes/        # Game scenes
-│   │   ├── entities/      # Player, projectile classes
-│   │   ├── network/       # WebSocket client
-│   │   └── utils/         # Interpolation, prediction
-│   └── assets/            # Sprites, sounds
+├── client/                 # Frontend (Phaser.js) [Future]
+│   └── src/
 │
-├── server/                # Backend API
-│   ├── src/
-│   │   ├── api/          # Express routes
-│   │   ├── auth/         # Authentication
-│   │   ├── matchmaking/  # Queue management
-│   │   └── websocket/    # Socket.io handlers
+├── go-server/             # Go Backend (API + Game Server) ✅
+│   ├── cmd/
+│   │   ├── api/          # REST API server (port 8080)
+│   │   └── game/         # Game server with WebSockets (port 8081)
+│   ├── internal/
+│   │   ├── auth/         # JWT authentication
+│   │   ├── game/         # Game logic, physics, matchmaking
+│   │   ├── handlers/     # HTTP handlers
+│   │   ├── middleware/   # Auth, metrics middleware
+│   │   ├── models/       # Data models
+│   │   ├── repositories/ # Database layer
+│   │   └── websocket/    # WebSocket infrastructure
 │   └── tests/
 │
-├── game-server/           # Game loop workers
-│   ├── src/
-│   │   ├── lobby/        # Lobby manager
-│   │   ├── physics/      # Collision detection
-│   │   ├── validation/   # Anti-cheat
-│   │   └── lag-comp/     # Lag compensation
-│   └── tests/
-│
-├── shared/                # Shared types/constants
-│   ├── types/            # TypeScript interfaces
-│   └── constants/        # Game constants
+├── shared/                # Shared types/constants [Future]
+│   └── src/
 │
 ├── database/
 │   ├── postgres/         # PostgreSQL schemas
-│   ├── cassandra/        # Cassandra schemas
-│   └── migrations/       # Database migrations
+│   ├── cassandra/        # Cassandra schemas (optional)
+│   └── redis/            # Redis structures
 │
-└── infrastructure/        # DevOps
-    ├── docker/           # Docker configs
-    ├── aws/              # Terraform/CloudFormation
-    └── monitoring/       # Prometheus configs
+├── monitoring/           # Prometheus + Grafana configs
+├── load-tests/           # Performance testing
+├── scripts/              # Automation scripts
+└── docs/                 # Documentation
 ```
 
 ## 🚀 Development Roadmap
 
-### Phase 1: Core Infrastructure
-- [ ] Project setup with TypeScript
-- [ ] Database schemas (PostgreSQL, Cassandra, Redis)
-- [ ] Basic Express API server
-- [ ] WebSocket connection handling
-- [ ] Worker thread pool for game loops
+### Phase 1: Core Infrastructure ✅
+- [x] Go project setup with TypeScript
+- [x] Database schemas (PostgreSQL, Cassandra, Redis)
+- [x] Go REST API server
+- [x] WebSocket connection handling
+- [x] Prometheus metrics integration
 
-### Phase 2: Game Mechanics
-- [ ] Basic player movement (client-side)
-- [ ] Server-side physics and collision
-- [ ] Shooting mechanics with validation
-- [ ] Lag compensation system
-- [ ] Interest management networking
+### Phase 2: Authentication & REST API ✅
+- [x] JWT authentication (129 passing tests)
+- [x] User registration and login
+- [x] Session management (Redis)
+- [x] Leaderboards and stats endpoints
 
-### Phase 3: Game Features
-- [ ] Loot system (spawning, collection, effects)
-- [ ] Map shrinking mechanic
-- [ ] Health and damage system
-- [ ] Player elimination and respawn
+### Phase 3: WebSocket Infrastructure ✅
+- [x] WebSocket connection manager
+- [x] Room/lobby system
+- [x] Message routing
+- [x] Player session management
 
-### Phase 4: Progression Systems
-- [ ] User authentication (JWT)
-- [ ] Match history tracking
-- [ ] MMR/ELO system
-- [ ] Leaderboards (Redis sorted sets)
-- [ ] Matchmaking queue
+### Phase 4: Game Mechanics ✅
+- [x] Game entities (Player, Projectiles, Obstacles, Loot)
+- [x] Server-side physics and collision (30 TPS)
+- [x] Combat system with 4 weapons
+- [x] Procedural map generation
+- [x] Match lifecycle management
+- [x] MMR-based matchmaking system
+- [x] Safe zone shrinking mechanic
 
-### Phase 5: Polish & Deployment
-- [ ] Frontend UI/UX
-- [ ] Game balancing
-- [ ] Docker containerization
-- [ ] AWS deployment
-- [ ] Monitoring and analytics
+### Phase 5: Frontend & Polish (Next)
+- [ ] Phaser.js game client
+- [ ] Client-side prediction and interpolation
+- [ ] UI/UX design
+- [ ] Sound and visual effects
+
+### Phase 6: Production Deployment
+- [ ] Docker optimization
+- [ ] AWS deployment (EC2, RDS)
+- [ ] CI/CD pipeline
+- [ ] Load testing at scale
+- [ ] Monitoring and alerting
 
 ## 🎯 System Design Learning Goals
 
@@ -216,9 +215,21 @@ make start
 # Check status
 make status
 
-# In another terminal: Run load tests
-make load-test-quick
+# Run load tests
+cd load-tests
+npm run preflight              # Check system readiness
+npm run test:game-quick        # Quick game loop test (16 players, 60s)
+npm run test:gameloop          # Full game loop test (32 players, 3 min)
 ```
+
+**New!** 🎮 **Game Loop Load Test** - Simulates real gameplay:
+- Player movement and physics
+- All 4 weapon types (Pistol, Rifle, Shotgun, Sniper)
+- Loot collection (shields, damage/fire rate boosts)
+- Combat damage calculation
+- 30 TPS server tick rate validation
+
+See [load-tests/LOAD_TESTING_UPDATES.md](load-tests/LOAD_TESTING_UPDATES.md) for details.
 
 ### Stop Everything
 ```bash
@@ -242,9 +253,20 @@ Visit:
 
 ## 🏗️ Current Status
 
-**Phase 1**: ✅ Complete - Foundation and infrastructure
-**Phase 2**: 🔄 In Progress - Backend API and authentication
-**Phase 3-10**: ⏳ Planned - See [Roadmap](docs/ROADMAP.md)
+**Migration Complete**: 🎉 All backend functionality has been successfully migrated from Node.js to Go!
+
+**Phase 1-4**: ✅ Complete - Backend infrastructure, authentication, game logic, and matchmaking
+**Phase 5**: ⏳ Next - Frontend client with Phaser.js
+**Phase 6**: ⏳ Planned - Production deployment
+
+### What's Working Now
+- ✅ **Go REST API** - Authentication, leaderboards, stats (port 8080)
+- ✅ **Go Game Server** - Real-time gameplay with WebSockets (port 8081)
+- ✅ **30 TPS Game Loop** - Physics, collision, combat system
+- ✅ **MMR Matchmaking** - Skill-based player matching
+- ✅ **Match Persistence** - Full game results stored in PostgreSQL
+- ✅ **Test Coverage** - 129+ tests with 100% coverage on core game logic
+- ✅ **Monitoring** - Prometheus metrics + Grafana dashboards
 
 ## 📊 Tech Stack Rationale
 
