@@ -151,4 +151,138 @@ var (
 		},
 		[]string{"operation", "cache_type"}, // get, set, delete
 	)
+
+	// Game Logic Metrics
+	GameTickDuration = promauto.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    "game_tick_duration_seconds",
+			Help:    "Duration of game tick processing in seconds",
+			Buckets: []float64{.001, .005, .01, .02, .033, .05, .1}, // 30 TPS = 33ms target
+		},
+	)
+
+	PlayerMovementsTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "game_player_movements_total",
+			Help: "Total number of player movement updates processed",
+		},
+		[]string{"movement_type"}, // walk, sprint, dash
+	)
+
+	MovementValidationDuration = promauto.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    "game_movement_validation_duration_seconds",
+			Help:    "Duration of movement validation (collision detection) in seconds",
+			Buckets: []float64{.0001, .0005, .001, .005, .01},
+		},
+	)
+
+	CollisionChecksTotal = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Name: "game_collision_checks_total",
+			Help: "Total number of collision checks performed",
+		},
+	)
+
+	CollisionsDetectedTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "game_collisions_detected_total",
+			Help: "Total number of collisions detected",
+		},
+		[]string{"collision_type"}, // player_obstacle, player_projectile, player_boundary
+	)
+
+	HitboxChecksTotal = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Name: "game_hitbox_checks_total",
+			Help: "Total number of hitbox checks performed",
+		},
+	)
+
+	HitboxHitsTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "game_hitbox_hits_total",
+			Help: "Total number of successful hitbox hits",
+		},
+		[]string{"hit_type"}, // projectile, melee, explosion
+	)
+
+	WeaponPickupsTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "game_weapon_pickups_total",
+			Help: "Total number of weapon pickups",
+		},
+		[]string{"weapon_type"}, // pistol, rifle, shotgun, sniper
+	)
+
+	LootSpawned = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "game_loot_spawned_total",
+			Help: "Total number of loot items spawned",
+		},
+		[]string{"loot_type"}, // weapon, health, armor, ammo
+	)
+
+	LootCollected = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "game_loot_collected_total",
+			Help: "Total number of loot items collected",
+		},
+		[]string{"loot_type"},
+	)
+
+	LootSpawnDuration = promauto.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    "game_loot_spawn_duration_seconds",
+			Help:    "Duration of loot spawn operations in seconds",
+			Buckets: []float64{.0001, .0005, .001, .005, .01},
+		},
+	)
+
+	ActiveLootItems = promauto.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "game_active_loot_items",
+			Help: "Current number of active loot items in all games",
+		},
+	)
+
+	ProjectilesFired = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "game_projectiles_fired_total",
+			Help: "Total number of projectiles fired",
+		},
+		[]string{"weapon_type"},
+	)
+
+	ProjectilesActive = promauto.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "game_projectiles_active",
+			Help: "Current number of active projectiles",
+		},
+	)
+
+	DamageDealt = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "game_damage_dealt",
+			Help:    "Amount of damage dealt by weapon type",
+			Buckets: []float64{5, 10, 20, 30, 50, 75, 100, 150},
+		},
+		[]string{"weapon_type"},
+	)
+
+	PlayerDeaths = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "game_player_deaths_total",
+			Help: "Total number of player deaths",
+		},
+		[]string{"death_cause"}, // weapon, safezone, fall
+	)
+
+	PhysicsUpdateDuration = promauto.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    "game_physics_update_duration_seconds",
+			Help:    "Duration of physics updates in seconds",
+			Buckets: []float64{.0001, .0005, .001, .005, .01, .02},
+		},
+	)
 )

@@ -4,6 +4,7 @@ import (
 	"math/rand"
 
 	"github.com/erceozmet/tank-royale-2/go-server/internal/game/entities"
+	"github.com/erceozmet/tank-royale-2/go-server/internal/metrics"
 )
 
 // LootTable defines the weighted probabilities for loot drops
@@ -47,14 +48,17 @@ func ApplyLootToPlayer(player *entities.Player, loot *entities.Loot) (bool, stri
 	switch loot.Type {
 	case entities.LootWeaponRifle:
 		player.SetWeapon(entities.WeaponRifle)
+		metrics.WeaponPickupsTotal.WithLabelValues("rifle").Inc()
 		return true, "Picked up Rifle"
 
 	case entities.LootWeaponShotgun:
 		player.SetWeapon(entities.WeaponShotgun)
+		metrics.WeaponPickupsTotal.WithLabelValues("shotgun").Inc()
 		return true, "Picked up Shotgun"
 
 	case entities.LootWeaponSniper:
 		player.SetWeapon(entities.WeaponSniper)
+		metrics.WeaponPickupsTotal.WithLabelValues("sniper").Inc()
 		return true, "Picked up Sniper"
 
 	case entities.LootShield:

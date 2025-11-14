@@ -3,9 +3,11 @@ package combat
 import (
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/erceozmet/tank-royale-2/go-server/internal/game"
 	"github.com/erceozmet/tank-royale-2/go-server/internal/game/entities"
+	"github.com/erceozmet/tank-royale-2/go-server/internal/metrics"
 )
 
 // ProjectileManager manages all projectiles in the game
@@ -58,6 +60,11 @@ func (pm *ProjectileManager) FireWeapon(player *entities.Player) (*entities.Proj
 	)
 
 	pm.Projectiles[projectileID] = projectile
+
+	// Track metrics
+	metrics.ProjectilesFired.WithLabelValues(string(player.CurrentWeapon)).Inc()
+	metrics.ProjectilesActive.Inc()
+
 	return projectile, nil
 }
 
@@ -66,6 +73,7 @@ func (pm *ProjectileManager) Update() {
 	for id, projectile := range pm.Projectiles {
 		if projectile.IsExpired() {
 			delete(pm.Projectiles, id)
+			metrics.ProjectilesActive.Dec()
 			continue
 		}
 		projectile.Update()
@@ -74,6 +82,9 @@ func (pm *ProjectileManager) Update() {
 
 // RemoveProjectile removes a projectile (e.g., after collision)
 func (pm *ProjectileManager) RemoveProjectile(id string) {
+	if _, exists := pm.Projectiles[id]; exists {
+		metrics.ProjectilesActive.Dec()
+	}
 	delete(pm.Projectiles, id)
 }
 
@@ -91,6 +102,7 @@ func (pm *ProjectileManager) CheckProjectileCollisions(
 	players map[string]*entities.Player,
 	obstacles []*entities.Obstacle,
 ) []CollisionEvent {
+	start := time.Now()
 	events := make([]CollisionEvent, 0)
 
 	for projID, proj := range pm.Projectiles {
@@ -107,10 +119,18 @@ func (pm *ProjectileManager) CheckProjectileCollisions(
 			}
 
 			// Check distance (simple circle collision)
+			metrics.HitboxChecksTotal.Inc()
 			distance := proj.Position.Distance(player.Position)
 			if distance <= game.PlayerRadius+game.ProjectileRadius {
 				// Hit!
+				metrics.HitboxHitsTotal.WithLabelValues("projectile").Inc()
+				metrics.CollisionsDetectedTotal.WithLabelValues("player_projectile").Inc()
+				metrics.DamageDealt.WithLabelValues(string(proj.WeaponType)).Observe(float64(proj.Damage))
+
 				died := player.TakeDamage(proj.Damage)
+				if died {
+					metrics.PlayerDeaths.WithLabelValues(string(proj.WeaponType)).Inc()
+				}
 
 				events = append(events, CollisionEvent{
 					Type:         CollisionTypePlayerHit,
@@ -133,8 +153,10 @@ func (pm *ProjectileManager) CheckProjectileCollisions(
 		}
 
 		for _, obstacle := range obstacles {
+			metrics.HitboxChecksTotal.Inc()
 			if obstacle.ContainsPoint(proj.Position) {
 				// Hit obstacle
+				metrics.HitboxHitsTotal.WithLabelValues("obstacle").Inc()
 				destroyed := false
 				if !obstacle.IsStatic {
 					destroyed = obstacle.TakeDamage(proj.Damage)
@@ -154,6 +176,9 @@ func (pm *ProjectileManager) CheckProjectileCollisions(
 			}
 		}
 	}
+
+	// Track hitbox check duration
+	metrics.PhysicsUpdateDuration.Observe(time.Since(start).Seconds())
 
 	return events
 }

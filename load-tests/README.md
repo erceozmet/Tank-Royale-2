@@ -7,8 +7,9 @@ Comprehensive load tests for Tank Royale 2 backend services.
 1. **API Endpoints** - REST API load testing (Go API server)
 2. **WebSocket Connections** - Real-time connection stress test
 3. **Matchmaking Queue** - Queue system performance
-4. **Game Loop Simulation** - Full gameplay with movement, combat, and loot (NEW!)
-5. **Database Performance** - PostgreSQL and Redis stress
+4. **Physics & Movement Simulation** - Realistic player movement with vectors, collisions, and powerups (NEW!)
+5. **Game Loop Simulation** - Full gameplay with movement, combat, and loot
+6. **Database Performance** - PostgreSQL and Redis stress
 
 ## Prerequisites
 
@@ -55,12 +56,14 @@ make start
 # In another terminal, run load tests
 cd load-tests
 npm install                      # First time only
+npm run preflight                # Verify system readiness
+npm run test:ws-simple           # Basic WebSocket connectivity (16 players)
+npm run test:physics-quick       # Physics simulation (8 players, 30s)
+npm run test:physics             # Full physics test (16 players, 60s)
+npm run test:physics-stress      # Stress test (32 players, 120s)
 npm run test:api                 # Test REST endpoints
 npm run test:websocket           # Test WebSocket connections
 npm run test:matchmaking         # Test matchmaking queue
-npm run test:gameloop            # Test game loop (NEW!)
-npm run test:game-quick          # Quick game test (16 players, 60s)
-npm run test:all                 # Run all tests
 ```
 
 ## 📊 Test Scenarios Explained
@@ -278,11 +281,42 @@ Install dependencies:
 npm install
 ```
 
+## 🎮 Physics & Movement Simulation Test
+
+NEW! Comprehensive physics simulation validating realistic player movement with vectors, collisions, and powerups.
+
+**Features tested:**
+- ✅ Vector-based movement (velocity, acceleration, friction)
+- ✅ 5 movement patterns (circular, zigzag, random walk, patrol, aggressive)
+- ✅ Boundary collision detection with bounce physics
+- ✅ Player-to-player collision with impulse response
+- ✅ Powerup collection (shields, damage/fire rate boosts)
+- ✅ Weapon switching and firing with cooldowns
+- ✅ 30 TPS simulation matching server tick rate
+
+**Quick Commands:**
+```bash
+npm run test:physics-quick       # 8 players, 30 seconds
+npm run test:physics             # 16 players, 60 seconds
+npm run test:physics-stress      # 32 players, 120 seconds
+```
+
+**Expected Results (16 players, 60s):**
+- Movement Updates: ~28,800 (468/sec)
+- Collisions: 1-10
+- Powerups Collected: 200-300
+- Shots Fired: 1,200-2,000
+- Messages/sec: 350-400
+
+**See [PHYSICS_TESTING.md](./PHYSICS_TESTING.md) for complete documentation.**
+
 ## 📚 Additional Resources
 
 - [Artillery Documentation](https://www.artillery.io/docs)
 - [Socket.IO Load Testing](https://socket.io/docs/v4/load-testing/)
 - [Node.js Performance Best Practices](https://nodejs.org/en/docs/guides/simple-profiling/)
+- [Physics Testing Guide](./PHYSICS_TESTING.md) (NEW!)
+- [Game Loop Testing Guide](./GAME_LOOP_TESTING.md)
 
 ## 🎉 Success Criteria
 
@@ -291,9 +325,11 @@ You're ready to move forward when:
 - ✅ No memory leaks detected (stable over time)
 - ✅ Response times within targets
 - ✅ Game loop maintains 30 TPS under load
+- ✅ Physics simulation shows realistic movement and collisions
+- ✅ Powerup collection and combat mechanics work correctly
 - ✅ System recovers after stress
 - ✅ Monitoring shows healthy metrics
-- ✅ Players can join, move, shoot, and collect loot without errors
+- ✅ Players can connect, move, collide, collect powerups, and fire weapons without errors
 
 **New Game Loop Test Success Indicators:**
 - ✅ 30 TPS maintained (±5 TPS acceptable)

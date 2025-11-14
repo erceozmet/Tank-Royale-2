@@ -1,8 +1,11 @@
 package combat
 
 import (
+	"time"
+
 	"github.com/erceozmet/tank-royale-2/go-server/internal/game"
 	"github.com/erceozmet/tank-royale-2/go-server/internal/game/entities"
+	"github.com/erceozmet/tank-royale-2/go-server/internal/metrics"
 )
 
 // Physics handles movement and collision detection
@@ -19,6 +22,8 @@ func (p *Physics) UpdatePlayerMovement(
 	input PlayerInput,
 	obstacles []*entities.Obstacle,
 ) {
+	start := time.Now()
+
 	if !player.IsAlive {
 		return
 	}
@@ -26,17 +31,27 @@ func (p *Physics) UpdatePlayerMovement(
 	// Calculate desired velocity based on input
 	desiredVelocity := entities.Vector2D{X: 0, Y: 0}
 
+	movementType := "idle"
 	if input.MoveForward {
 		desiredVelocity.Y -= game.PlayerBaseSpeed
+		movementType = "walk"
 	}
 	if input.MoveBackward {
 		desiredVelocity.Y += game.PlayerBaseSpeed
+		movementType = "walk"
 	}
 	if input.MoveLeft {
 		desiredVelocity.X -= game.PlayerBaseSpeed
+		movementType = "walk"
 	}
 	if input.MoveRight {
 		desiredVelocity.X += game.PlayerBaseSpeed
+		movementType = "walk"
+	}
+
+	// Track movement if player is moving
+	if desiredVelocity.Magnitude() > 0 {
+		metrics.PlayerMovementsTotal.WithLabelValues(movementType).Inc()
 	}
 
 	// Normalize diagonal movement
@@ -48,17 +63,26 @@ func (p *Physics) UpdatePlayerMovement(
 	newPosition := player.Position.Add(desiredVelocity)
 
 	// Check map boundaries
+	boundaryCollision := false
 	if newPosition.X < game.PlayerRadius {
 		newPosition.X = game.PlayerRadius
+		boundaryCollision = true
 	}
 	if newPosition.X > game.MapWidth-game.PlayerRadius {
 		newPosition.X = game.MapWidth - game.PlayerRadius
+		boundaryCollision = true
 	}
 	if newPosition.Y < game.PlayerRadius {
 		newPosition.Y = game.PlayerRadius
+		boundaryCollision = true
 	}
 	if newPosition.Y > game.MapHeight-game.PlayerRadius {
 		newPosition.Y = game.MapHeight - game.PlayerRadius
+		boundaryCollision = true
+	}
+
+	if boundaryCollision {
+		metrics.CollisionsDetectedTotal.WithLabelValues("player_boundary").Inc()
 	}
 
 	// Check obstacle collisions
@@ -89,10 +113,15 @@ func (p *Physics) UpdatePlayerMovement(
 	if input.Rotation != 0 {
 		player.Rotation = input.Rotation
 	}
+
+	// Track movement validation duration
+	metrics.MovementValidationDuration.Observe(time.Since(start).Seconds())
 }
 
 // checkObstacleCollision checks if a position collides with any obstacle
 func (p *Physics) checkObstacleCollision(position entities.Vector2D, obstacles []*entities.Obstacle) bool {
+	metrics.CollisionChecksTotal.Inc()
+
 	for _, obstacle := range obstacles {
 		minX, minY, maxX, maxY := obstacle.GetBounds()
 
@@ -104,6 +133,7 @@ func (p *Physics) checkObstacleCollision(position entities.Vector2D, obstacles [
 
 		// Check if player position is inside expanded bounds
 		if position.X >= minX && position.X <= maxX && position.Y >= minY && position.Y <= maxY {
+			metrics.CollisionsDetectedTotal.WithLabelValues("player_obstacle").Inc()
 			return true
 		}
 	}
@@ -112,6 +142,8 @@ func (p *Physics) checkObstacleCollision(position entities.Vector2D, obstacles [
 
 // CheckPlayerCollisions checks for player-to-player collisions (push apart)
 func (p *Physics) CheckPlayerCollisions(players map[string]*entities.Player) {
+	start := time.Now()
+
 	playerList := make([]*entities.Player, 0, len(players))
 	for _, player := range players {
 		if player.IsAlive {
@@ -125,11 +157,13 @@ func (p *Physics) CheckPlayerCollisions(players map[string]*entities.Player) {
 			p1 := playerList[i]
 			p2 := playerList[j]
 
+			metrics.CollisionChecksTotal.Inc()
 			distance := p1.Position.Distance(p2.Position)
 			minDistance := game.PlayerRadius * 2
 
 			if distance < minDistance {
 				// Push apart
+				metrics.CollisionsDetectedTotal.WithLabelValues("player_player").Inc()
 				pushDirection := p1.Position.Subtract(p2.Position).Normalize()
 				pushAmount := (minDistance - distance) / 2
 
@@ -138,6 +172,8 @@ func (p *Physics) CheckPlayerCollisions(players map[string]*entities.Player) {
 			}
 		}
 	}
+
+	metrics.PhysicsUpdateDuration.Observe(time.Since(start).Seconds())
 }
 
 // PlayerInput represents player input for a tick

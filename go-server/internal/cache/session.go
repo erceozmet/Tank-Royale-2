@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/erceozmet/tank-royale-2/go-server/internal/metrics"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -51,10 +52,16 @@ func (sm *SessionManager) SetSession(ctx context.Context, userID string, data Se
 		return fmt.Errorf("failed to marshal session data: %w", err)
 	}
 	
+	// Track cache operation duration
+	start := time.Now()
+	
 	// Store with TTL
 	if err := sm.client.Set(ctx, key, sessionJSON, sessionTTL).Err(); err != nil {
 		return fmt.Errorf("failed to set session in Redis: %w", err)
 	}
+	
+	duration := time.Since(start).Seconds()
+	metrics.CacheOperationDuration.WithLabelValues("set", "session").Observe(duration)
 	
 	return nil
 }
@@ -63,13 +70,24 @@ func (sm *SessionManager) SetSession(ctx context.Context, userID string, data Se
 func (sm *SessionManager) GetSession(ctx context.Context, userID string) (*SessionData, error) {
 	key := fmt.Sprintf("%s%s", sessionPrefix, userID)
 	
+	start := time.Now()
 	result, err := sm.client.Get(ctx, key).Result()
+	duration := time.Since(start).Seconds()
+	
+	// Track cache operation duration
+	metrics.CacheOperationDuration.WithLabelValues("get", "session").Observe(duration)
+	
 	if err == redis.Nil {
+		// Cache miss
+		metrics.CacheMisses.WithLabelValues("session").Inc()
 		return nil, nil // Session not found
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get session from Redis: %w", err)
 	}
+	
+	// Cache hit
+	metrics.CacheHits.WithLabelValues("session").Inc()
 	
 	var session SessionData
 	if err := json.Unmarshal([]byte(result), &session); err != nil {
@@ -83,9 +101,14 @@ func (sm *SessionManager) GetSession(ctx context.Context, userID string) (*Sessi
 func (sm *SessionManager) DeleteSession(ctx context.Context, userID string) error {
 	key := fmt.Sprintf("%s%s", sessionPrefix, userID)
 	
+	start := time.Now()
+	
 	if err := sm.client.Del(ctx, key).Err(); err != nil {
 		return fmt.Errorf("failed to delete session from Redis: %w", err)
 	}
+	
+	duration := time.Since(start).Seconds()
+	metrics.CacheOperationDuration.WithLabelValues("delete", "session").Observe(duration)
 	
 	return nil
 }

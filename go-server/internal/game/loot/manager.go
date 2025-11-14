@@ -3,8 +3,10 @@ package loot
 import (
 	"fmt"
 	"math/rand"
+	"time"
 
 	"github.com/erceozmet/tank-royale-2/go-server/internal/game/entities"
+	"github.com/erceozmet/tank-royale-2/go-server/internal/metrics"
 )
 
 // CrateManager manages crates and their contained loot
@@ -23,6 +25,8 @@ func NewCrateManager() *CrateManager {
 
 // SpawnCrate creates a new crate with random loot at the specified position
 func (cm *CrateManager) SpawnCrate(position entities.Vector2D) string {
+	start := time.Now()
+
 	crateID := fmt.Sprintf("crate_%d", rand.Int63())
 	lootID := fmt.Sprintf("loot_%d", rand.Int63())
 
@@ -35,6 +39,11 @@ func (cm *CrateManager) SpawnCrate(position entities.Vector2D) string {
 
 	cm.Crates[crateID] = crate
 	cm.Loot[lootID] = loot
+
+	// Track metrics
+	metrics.LootSpawned.WithLabelValues(string(lootType)).Inc()
+	metrics.ActiveLootItems.Inc()
+	metrics.LootSpawnDuration.Observe(time.Since(start).Seconds())
 
 	return crateID
 }
@@ -60,9 +69,14 @@ func (cm *CrateManager) OpenCrate(crateID string) (*entities.Loot, bool) {
 
 // CollectLoot removes loot from the manager (after it's been picked up)
 func (cm *CrateManager) CollectLoot(lootID string) bool {
-	if _, exists := cm.Loot[lootID]; !exists {
+	loot, exists := cm.Loot[lootID]
+	if !exists {
 		return false
 	}
+
+	// Track metrics
+	metrics.LootCollected.WithLabelValues(string(loot.Type)).Inc()
+	metrics.ActiveLootItems.Dec()
 
 	delete(cm.Loot, lootID)
 	return true
@@ -73,6 +87,11 @@ func (cm *CrateManager) RemoveCrate(crateID string) bool {
 	crate, exists := cm.Crates[crateID]
 	if !exists {
 		return false
+	}
+
+	// Track metrics if loot still exists (wasn't collected)
+	if _, lootExists := cm.Loot[crate.LootID]; lootExists {
+		metrics.ActiveLootItems.Dec()
 	}
 
 	// Remove associated loot

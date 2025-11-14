@@ -1,0 +1,525 @@
+{
+  "id": null,
+  "uid": "tank-game-logic",
+  "title": "Tank Royale - Game Logic Performance",
+  "tags": ["tank-royale", "game", "performance", "metrics"],
+  "timezone": "browser",
+  "schemaVersion": 16,
+  "version": 1,
+  "refresh": "5s",
+  "panels": [
+    {
+      "id": 1,
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "type": "timeseries",
+      "title": "Weapon Pickups Rate",
+      "targets": [
+        {
+          "expr": "rate(game_weapon_pickups_total[1m])",
+          "legendFormat": "{{weapon_type}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "stacking": {"mode": "normal"}
+          },
+          "unit": "pickups/s",
+          "min": 0
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "type": "timeseries",
+      "title": "Loot Spawn & Collection Rate",
+      "targets": [
+        {
+          "expr": "rate(game_loot_spawned_total[1m])",
+          "legendFormat": "Spawned - {{loot_type}}",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(game_loot_collected_total[1m])",
+          "legendFormat": "Collected - {{loot_type}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "items/s",
+          "min": 0
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "type": "timeseries",
+      "title": "Player Movement Rate",
+      "targets": [
+        {
+          "expr": "rate(game_player_movements_total[1m])",
+          "legendFormat": "{{movement_type}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 20,
+            "showPoints": "never",
+            "stacking": {"mode": "normal"}
+          },
+          "unit": "movements/s",
+          "min": 0
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "type": "timeseries",
+      "title": "Collision Detection Performance",
+      "targets": [
+        {
+          "expr": "rate(game_collision_checks_total[1m])",
+          "legendFormat": "Checks per second",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(game_collisions_detected_total[1m])",
+          "legendFormat": "Detected - {{collision_type}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "checks/s",
+          "min": 0
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "type": "timeseries",
+      "title": "Hitbox Checks & Hits",
+      "targets": [
+        {
+          "expr": "rate(game_hitbox_checks_total[1m])",
+          "legendFormat": "Total Checks",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(game_hitbox_hits_total[1m])",
+          "legendFormat": "Hits - {{hit_type}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "checks/s",
+          "min": 0
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+      "type": "timeseries",
+      "title": "Projectiles Fired Rate (by weapon)",
+      "targets": [
+        {
+          "expr": "rate(game_projectiles_fired_total[1m])",
+          "legendFormat": "{{weapon_type}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "stacking": {"mode": "normal"}
+          },
+          "unit": "projectiles/s",
+          "min": 0
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 16,
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+      "type": "timeseries",
+      "title": "Active Projectiles",
+      "targets": [
+        {
+          "expr": "game_projectiles_active",
+          "legendFormat": "Active Projectiles",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 3,
+            "fillOpacity": 20,
+            "showPoints": "never"
+          },
+          "color": {"mode": "fixed", "fixedColor": "red"},
+          "unit": "short",
+          "min": 0
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+      "type": "heatmap",
+      "title": "Movement Validation Latency",
+      "targets": [
+        {
+          "expr": "rate(game_movement_validation_duration_seconds_bucket[1m])",
+          "legendFormat": "{{le}}",
+          "format": "heatmap",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "calculate": true,
+        "cellGap": 2,
+        "color": {
+          "mode": "scheme",
+          "scheme": "Spectral",
+          "steps": 128
+        },
+        "yAxis": {
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32},
+      "type": "heatmap",
+      "title": "Physics Update Latency",
+      "targets": [
+        {
+          "expr": "rate(game_physics_update_duration_seconds_bucket[1m])",
+          "legendFormat": "{{le}}",
+          "format": "heatmap",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "calculate": true,
+        "cellGap": 2,
+        "color": {
+          "mode": "scheme",
+          "scheme": "Spectral",
+          "steps": 128
+        },
+        "yAxis": {
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "gridPos": {"h": 8, "w": 8, "x": 12, "y": 32},
+      "type": "timeseries",
+      "title": "Damage Dealt Distribution",
+      "targets": [
+        {
+          "expr": "rate(game_damage_dealt_sum[1m])",
+          "legendFormat": "{{weapon_type}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 80,
+            "showPoints": "never"
+          },
+          "unit": "damage/s",
+          "min": 0
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 40},
+      "type": "timeseries",
+      "title": "Player Deaths by Cause",
+      "targets": [
+        {
+          "expr": "rate(game_player_deaths_total[1m])",
+          "legendFormat": "{{death_cause}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 80,
+            "showPoints": "never",
+            "stacking": {"mode": "normal"}
+          },
+          "unit": "deaths/s",
+          "min": 0
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 40},
+      "type": "timeseries",
+      "title": "Active Loot Items",
+      "targets": [
+        {
+          "expr": "game_active_loot_items",
+          "legendFormat": "Loot Items",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 3,
+            "fillOpacity": 20,
+            "showPoints": "never"
+          },
+          "color": {"mode": "fixed", "fixedColor": "yellow"},
+          "unit": "short",
+          "min": 0
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "gridPos": {"h": 5, "w": 6, "x": 16, "y": 40},
+      "type": "stat",
+      "title": "Total Weapon Pickups",
+      "targets": [
+        {
+          "expr": "sum(game_weapon_pickups_total)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds", "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "blue"},
+              {"value": 100, "color": "green"},
+              {"value": 500, "color": "yellow"},
+              {"value": 1000, "color": "red"}
+            ]
+          }},
+          "unit": "short"
+        }
+      },
+      "options": {
+        "textMode": "value_and_name",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 13,
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 48},
+      "type": "stat",
+      "title": "Collision Check Rate",
+      "targets": [
+        {
+          "expr": "rate(game_collision_checks_total[1m])",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds", "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "green"},
+              {"value": 1000, "color": "yellow"},
+              {"value": 5000, "color": "red"}
+            ]
+          }},
+          "unit": "checks/s"
+        }
+      },
+      "options": {
+        "textMode": "value_and_name",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 14,
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 48},
+      "type": "stat",
+      "title": "Hitbox Accuracy",
+      "targets": [
+        {
+          "expr": "rate(game_hitbox_hits_total[1m]) / rate(game_hitbox_checks_total[1m]) * 100",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds", "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "red"},
+              {"value": 5, "color": "yellow"},
+              {"value": 10, "color": "green"}
+            ]
+          }},
+          "unit": "percent",
+          "decimals": 2
+        }
+      },
+      "options": {
+        "textMode": "value_and_name",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 15,
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 48},
+      "type": "stat",
+      "title": "Avg Loot Spawn Time",
+      "targets": [
+        {
+          "expr": "rate(game_loot_spawn_duration_seconds_sum[1m]) / rate(game_loot_spawn_duration_seconds_count[1m]) * 1000",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds", "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "green"},
+              {"value": 1, "color": "yellow"},
+              {"value": 5, "color": "red"}
+            ]
+          }},
+          "unit": "ms",
+          "decimals": 2
+        }
+      },
+      "options": {
+        "textMode": "value_and_name",
+        "graphMode": "area"
+      }
+    }
+  ]
+}
