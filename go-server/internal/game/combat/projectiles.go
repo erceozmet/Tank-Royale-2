@@ -141,11 +141,11 @@ func (pm *ProjectileManager) CheckProjectileCollisions(
 				}
 
 				events = append(events, CollisionEvent{
-					Type:            CollisionTypeObstacleHit,
-					ProjectileID:    projID,
-					TargetID:        obstacle.ID,
-					ShooterID:       proj.PlayerID,
-					Damage:          proj.Damage,
+					Type:              CollisionTypeObstacleHit,
+					ProjectileID:      projID,
+					TargetID:          obstacle.ID,
+					ShooterID:         proj.PlayerID,
+					Damage:            proj.Damage,
 					ObstacleDestroyed: destroyed,
 				})
 

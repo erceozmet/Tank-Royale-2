@@ -142,6 +142,13 @@ public
 # Start here guide (for initial setup only)
 START_HERE.md
 
+# Legacy scripts (moved to .legacy-scripts/)
+.legacy-scripts/
+
+# Temporary files from Go server execution
+/tmp/tank-*.log
+/tmp/tank-*.pid
+
 # Postman environment files (may contain sensitive tokens)
 postman/*environment*.json
 postman/*.postman_environment.json

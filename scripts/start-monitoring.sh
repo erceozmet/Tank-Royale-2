@@ -70,7 +70,7 @@ echo ""
 echo "  Application:     http://localhost:3000/metrics"
 echo "  Redis:           http://localhost:9121/metrics"
 echo "  PostgreSQL:      http://localhost:9187/metrics"
-echo "  Node:            http://localhost:9100/metrics"
+
 echo ""
 echo -e "${YELLOW}💡 Tip:${NC} The 'Tank Royale 2 - System Overview' dashboard is pre-loaded in Grafana"
 echo ""

@@ -2,6 +2,29 @@
 
 A real-time multiplayer .io-style battle royale game built to showcase system design, multi-threading, caching, and distributed databases.
 
+## 🚀 Quick Start
+
+```bash
+# First time setup
+make setup
+
+# Start everything
+make start
+
+# Stop everything
+make stop
+
+# See all commands
+make help
+```
+
+**That's it!** Access services at:
+- API Server: http://localhost:8080
+- Game Server: http://localhost:8081
+- Grafana: http://localhost:3001 (admin/admin123)
+
+📖 Full docs: [START_HERE.md](START_HERE.md) | [BOOT_COMMANDS.md](BOOT_COMMANDS.md)
+
 ## 🎮 Game Features
 
 - **16-player lobbies** with real-time combat
@@ -15,7 +38,7 @@ A real-time multiplayer .io-style battle royale game built to showcase system de
 
 ### Tech Stack
 - **Frontend**: TypeScript, Phaser.js, Socket.io-client
-- **Backend**: Node.js, TypeScript, Express, Socket.io
+- **Backend**: Go, WebSockets, REST API
 - **Game Server**: Worker Threads (30 TPS per lobby)
 - **Databases**: 
   - PostgreSQL (user accounts, match results)
@@ -181,37 +204,32 @@ This project showcases advanced system design concepts:
 git clone <repository-url>
 cd tank-royale-2
 
-# Install dependencies
-cd server && npm install
-cd ../load-tests && npm install
-cd ..
-
 # Start all containers with one command
-./tank.sh setup
+make setup
 ```
 
 ### Regular Development
 ```bash
-# Start all containers (databases, monitoring, admin tools)
-./tank.sh start
+# Start everything (containers + Go servers)
+make start
 
-# Start the API server
-cd server && npm run dev
+# Check status
+make status
 
 # In another terminal: Run load tests
-cd load-tests && npm run test:quick
+make load-test-quick
 ```
 
 ### Stop Everything
 ```bash
-# Stop all containers
-./tank.sh stop
+# Stop everything
+make stop
 ```
 
 ### Quick Help
 ```bash
 # See all available commands
-./tank.sh help
+make help
 ```
 
 Visit:
@@ -233,7 +251,7 @@ Visit:
 | Technology | Purpose | Why Chosen |
 |------------|---------|------------|
 | **TypeScript** | Full-stack language | Type safety, easier refactoring |
-| **Node.js** | Backend runtime | Real-time friendly, event-driven |
+| **Go** | Backend runtime | High-performance, concurrent, efficient |
 | **Phaser.js** | Game engine | Mature 2D framework, large community |
 | **Socket.io** | WebSocket library | Easy real-time communication |
 | **PostgreSQL** | Relational DB | ACID compliance, complex queries |

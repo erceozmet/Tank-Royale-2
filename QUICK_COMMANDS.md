@@ -1,51 +1,106 @@
 # 🚀 Tank Royale 2 - Quick Command Reference
 
-## Start Services
+## 🎯 Unified Task Runner (Make)
+
+All tasks consolidated into one Makefile - similar to Gradle!
 
 ```bash
-# Start monitoring stack (databases + monitoring)
-./start-monitoring.sh
+make help    # Show all available commands
+```
 
-# Start API server (development mode)
-cd server && npm run dev
+## Start/Stop Services
 
-# Start all databases only
-./start-databases.sh
+```bash
+# Unified commands
+make start               # 🚀 Start everything
+make stop                # 🛑 Stop everything
+make restart             # 🔄 Restart everything
+make status              # 📊 Show service status
+
+# Individual components
+make containers-start    # Start containers only
+make containers-stop     # Stop containers only
+make go-start           # Start Go servers only
+make go-stop            # Stop Go servers only
+make db-start           # Start databases only
+make monitoring-start   # Start monitoring only
+```
+
+## Development
+
+```bash
+make dev                 # Build + start (perfect after code changes)
+make health              # Check all health endpoints
+make urls                # Show all service URLs
+make test                # Run all tests
+make test-coverage       # Run tests with coverage
+make fmt                 # Format code
+make lint                # Run linters
+```
+
+## Go Server Management
+
+```bash
+make go-build            # Build Go servers
+make go-start            # Start Go servers
+make go-stop             # Stop Go servers
+make go-restart          # Restart Go servers
+make go-logs-api         # View API server logs
+make go-logs-game        # View Game server logs
+make go-test             # Run Go tests
+make go-test-coverage    # Run tests with coverage
+make go-fmt              # Format Go code
+```
+
+## Database Management
+
+```bash
+make db-start            # Start all databases
+make db-status           # Check database connection status
+make db-shell-postgres   # Open PostgreSQL shell
+make db-shell-redis      # Open Redis CLI
+make db-shell-cassandra  # Open Cassandra CQL shell
+make db-reset-postgres   # Reset PostgreSQL (CAUTION!)
+```
+
+## Container Management
+
+```bash
+make containers-start    # Start all containers
+make containers-stop     # Stop all containers
+make containers-restart  # Restart all containers
+make containers-status   # Check container status
+make containers-logs SERVICE=postgres  # View specific logs
+make containers-clean    # Remove all (CAUTION: deletes data!)
 ```
 
 ## Load Testing
 
 ```bash
-cd load-tests
-
-# Setup test users (run once)
-npm run setup
-
-# Run individual tests
-npm run test:api          # HTTP API load test
-npm run test:websocket    # WebSocket stress test  
-npm run test:matchmaking  # Matchmaking queue test
-
-# Run all tests
-npm run test:all
-
-# Quick test (reduced load)
-npm run test:quick
+make load-test-setup     # Setup test users (run once)
+make load-test-quick     # Quick load test
+make load-test-api       # API load test
+make load-test-websocket # WebSocket load test
+make load-test-all       # Run all load tests
 ```
 
-## Testing
+## Utilities
 
 ```bash
-cd server
+make clean               # Clean build artifacts and logs
+make logs SERVICE=api    # View logs (api|game|postgres|redis|etc)
+make ps                  # Show running processes
+make ports               # Show ports in use
+make quickstart          # Show quick reference
+make version             # Show version info
+```
 
-# Run all tests with coverage
-npm test
+## Monitoring
 
-# Watch mode
-npm run test:watch
-
-# Unit tests only
-npm run test:unit
+```bash
+make monitoring-start            # Start Prometheus + Grafana
+make monitoring-open-grafana     # Open Grafana in browser
+make monitoring-open-prometheus  # Open Prometheus in browser
 ```
 
 ## Monitoring Dashboards
@@ -118,28 +173,25 @@ redis-cli FLUSHALL             # Clear all (careful!)
 ### Full System Test
 ```bash
 # 1. Start everything
-./start-monitoring.sh
-cd server && npm run dev &
+make start
 
-# 2. Wait 10 seconds for startup
+# 2. Wait for startup
 sleep 10
 
 # 3. Run load tests
-cd ../load-tests
-npm run setup
-npm run test:all
+make load-test-all
 
 # 4. Check Grafana
-open http://localhost:3001
+make monitoring-open-grafana
 ```
 
 ### Debug Performance Issue
 ```bash
 # 1. Open Grafana dashboard
-open http://localhost:3001
+make monitoring-open-grafana
 
 # 2. Run load test
-cd load-tests && npm run test:api
+make load-test-api
 
 # 3. Watch metrics in real-time
 # - HTTP latency panel
@@ -148,7 +200,7 @@ cd load-tests && npm run test:api
 # - CPU usage
 
 # 4. Check Prometheus for detailed queries
-open http://localhost:9090
+make monitoring-open-prometheus
 ```
 
 ### Clean Restart
@@ -191,10 +243,8 @@ CLIENT_URL=http://localhost:3000
 
 ```
 Tank-Royale-2/
-├── server/          # API server (Node.js + Express + Socket.IO)
-├── game-server/     # Game server (future Phase 4)
-├── client/          # Frontend (future Phase 5)
-├── shared/          # Shared types and utilities
+├── go-server/       # Go API + Game servers
+├── client/          # Frontend (future development)
 ├── load-tests/      # Load testing suite
 ├── monitoring/      # Prometheus + Grafana configs
 ├── database/        # Database schemas
@@ -206,27 +256,25 @@ Tank-Royale-2/
 
 | Service | Port | Description |
 |---------|------|-------------|
-| API Server | 3000 | Main backend API |
+| API Server | 8080 | Main backend API |
+| Game Server | 8081 | WebSocket game server |
 | Grafana | 3001 | Monitoring dashboards |
 | PostgreSQL | 5432 | User/match database |
 | Redis | 6379 | Sessions/cache |
-| pgAdmin | 8080 | PostgreSQL GUI |
-| Redis Commander | 8081 | Redis GUI |
+| pgAdmin | 5050 | PostgreSQL GUI |
+| Redis Commander | 8082 | Redis GUI |
 | Prometheus | 9090 | Metrics storage |
-| Redis Exporter | 9121 | Redis metrics |
-| Node Exporter | 9100 | System metrics |
-| Postgres Exporter | 9187 | PostgreSQL metrics |
-| Cassandra | 9042 | Telemetry (Phase 6) |
+| Cassandra | 9042 | Telemetry storage |
 
 ## Troubleshooting
 
 ### Port Already in Use
 ```bash
-# Find process using port 3000
-lsof -ti:3000
+# Find process using port 8080
+lsof -ti:8080
 
 # Kill process
-kill -9 $(lsof -ti:3000)
+kill -9 $(lsof -ti:8080)
 ```
 
 ### Database Connection Failed
@@ -257,11 +305,13 @@ open http://localhost:9090/targets
 # Ensure server is running
 curl http://localhost:3000/health
 
+```bash
 # Check test users exist
-cd load-tests && npm run setup
+make load-test-setup
 
 # Run with reduced load
-npm run test:quick
+make load-test-quick
+```
 ```
 
 ## Performance Targets
@@ -293,4 +343,4 @@ After load testing and optimization:
 
 ---
 
-**Ready to test?** Run `./start-monitoring.sh` and `cd load-tests && npm run test:all` 🚀
+**Ready to test?** Run `make start` and `make load-test-all` 🚀

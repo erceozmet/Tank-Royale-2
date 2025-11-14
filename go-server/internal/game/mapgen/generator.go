@@ -121,7 +121,7 @@ func (mg *MapGenerator) validateConnectivity(minReachablePercent float64) bool {
 	// Mark obstacle cells as blocked
 	for _, obstacle := range mg.Obstacles {
 		minX, minY, maxX, maxY := obstacle.GetBounds()
-		
+
 		startCellX := int(minX / GridCellSize)
 		startCellY := int(minY / GridCellSize)
 		endCellX := int(maxX / GridCellSize)

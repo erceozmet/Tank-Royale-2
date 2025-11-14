@@ -26,7 +26,7 @@ container_exists() {
     podman ps -a --format "{{.Names}}" | grep -q "^$1$"
 }
 
-# Function to wait for container health
+# Function to wait for container health using direct commands
 wait_for_health() {
     local container=$1
     local max_wait=${2:-60}
@@ -34,11 +34,35 @@ wait_for_health() {
     
     echo -e "${YELLOW}Waiting for $container to be healthy...${NC}"
     
+    # Use direct health checks instead of container health status
     while [ $elapsed -lt $max_wait ]; do
-        if podman inspect --format='{{.State.Health.Status}}' "$container" 2>/dev/null | grep -q "healthy"; then
-            echo -e "${GREEN}✓ $container is healthy${NC}"
-            return 0
-        fi
+        case "$container" in
+            "tank-postgres")
+                if podman exec "$container" pg_isready -U tank_user -d tank_royale >/dev/null 2>&1; then
+                    echo -e "${GREEN}✓ $container is healthy${NC}"
+                    return 0
+                fi
+                ;;
+            "tank-redis")
+                if podman exec "$container" redis-cli ping >/dev/null 2>&1; then
+                    echo -e "${GREEN}✓ $container is healthy${NC}"
+                    return 0
+                fi
+                ;;
+            "tank-cassandra")
+                if podman exec "$container" cqlsh -e "describe keyspaces" >/dev/null 2>&1; then
+                    echo -e "${GREEN}✓ $container is healthy${NC}"
+                    return 0
+                fi
+                ;;
+            *)
+                # For other containers, just check if they're running
+                if is_container_running "$container"; then
+                    echo -e "${GREEN}✓ $container is running${NC}"
+                    return 0
+                fi
+                ;;
+        esac
         sleep 2
         elapsed=$((elapsed + 2))
         echo -n "."
@@ -51,6 +75,7 @@ wait_for_health() {
 # Function to start or restart a container
 start_container() {
     local name=$1
+    local optional=${2:-false}
     
     if is_container_running "$name"; then
         echo -e "${GREEN}✓ $name is already running${NC}"
@@ -59,8 +84,13 @@ start_container() {
         echo -e "${YELLOW}→ Starting existing container: $name${NC}"
         podman start "$name"
     else
-        echo -e "${RED}✗ Container $name doesn't exist. Run 'podman compose up -d' first.${NC}"
-        return 1
+        if [ "$optional" = "true" ]; then
+            echo -e "${YELLOW}⊘ $name doesn't exist (optional, skipping)${NC}"
+            return 0
+        else
+            echo -e "${RED}✗ Container $name doesn't exist. Run 'podman compose up -d' first.${NC}"
+            return 1
+        fi
     fi
 }
 
@@ -91,16 +121,6 @@ wait_for_health "tank-cassandra" 90  # Cassandra takes longer
 echo ""
 echo -e "${BLUE}Step 3: Starting Monitoring Stack${NC}"
 echo "==================================\n"
-
-# Start exporters
-echo "Starting Redis Exporter..."
-start_container "tank-redis-exporter"
-
-echo "Starting PostgreSQL Exporter..."
-start_container "tank-postgres-exporter"
-
-echo "Starting Node Exporter..."
-start_container "tank-node-exporter"
 
 # Start Prometheus
 echo "Starting Prometheus..."
@@ -156,25 +176,20 @@ echo "    Password:       admin123"
 echo ""
 echo "  Prometheus:       http://localhost:9090"
 echo ""
-echo -e "${GREEN}Metrics Exporters:${NC}"
-echo "  Redis Exporter:   http://localhost:9121/metrics"
-echo "  Postgres Exporter: http://localhost:9187/metrics"
-echo "  Node Exporter:    http://localhost:9100/metrics"
-echo ""
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}Next Steps:${NC}"
 echo -e "${BLUE}========================================${NC}"
-echo "1. Start the API server:"
-echo "   cd server && npm run dev"
+echo "1. Start the Go servers:"
+echo "   make go-start"
 echo ""
-echo "2. Start the game server:"
-echo "   cd game-server && npm run dev"
+echo "2. Check server status:"
+echo "   make status"
 echo ""
-echo "3. View server metrics:"
-echo "   curl http://localhost:3000/metrics"
+echo "3. View server logs:"
+echo "   make logs SERVICE=api"
 echo ""
 echo "4. Run load tests:"
-echo "   cd load-tests && npm run test:quick"
+echo "   make load-test-quick"
 echo ""
 echo -e "${YELLOW}To stop all containers:${NC}"
 echo "  ./stop-all.sh"

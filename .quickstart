@@ -1,0 +1,31 @@
+╔══════════════════════════════════════════════════════════════╗
+║              Tank Royale 2 - Quick Start                    ║
+╚══════════════════════════════════════════════════════════════╝
+
+🎯 UNIFIED TASK RUNNER (RECOMMENDED):
+   make help             - Show all commands
+   make start            - Start everything
+   make stop             - Stop everything
+   make status           - Check service status
+
+� OR USE DIRECT SCRIPTS:
+   ./start-everything.sh - Start all
+   ./stop-everything.sh  - Stop all
+
+📋 Common Make Commands:
+   make dev              - Build and start
+   make go-build         - Build Go servers
+   make go-test          - Run tests
+   make db-status        - Check databases
+   make urls             - Show all URLs
+
+🔗 Services:
+   API:     http://localhost:8080
+   Game:    http://localhost:8081
+   Grafana: http://localhost:3001 (admin/admin123)
+
+📖 Documentation:
+   make help             - Full command list
+   README.md             - Overview
+   START_HERE.md         - Full guide
+   BOOT_COMMANDS.md      - All boot commands

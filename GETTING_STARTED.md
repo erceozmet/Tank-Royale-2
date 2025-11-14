@@ -15,17 +15,38 @@ This script will:
 - Display all service URLs and credentials
 
 ### Regular Start (After Setup)
+
+**🚀 ONE COMMAND - Start Everything:**
 ```bash
-# Start all existing containers
-./tank.sh start
+# Start all containers AND Go servers
+./start-everything.sh
 ```
 
-This quickly starts all previously created containers with proper health checks.
+This script:
+- Starts all containers (databases, monitoring, admin tools)
+- Waits for databases to be ready
+- Builds Go servers if needed
+- Starts API server (port 8080)
+- Starts Game server (port 8081)
+- Tests all health endpoints
+
+**Alternative - Start individually:**
+```bash
+# Just containers
+./tank.sh start
+
+# Just Go servers (after containers are running)
+./start-go-servers.sh
+```
 
 ## 🛑 Stop Everything
 ```bash
-# Stop all containers (keeps data)
-./tank.sh stop
+# Stop all containers AND Go servers
+./stop-everything.sh
+
+# Or stop individually:
+./tank.sh stop              # Containers only
+./stop-go-servers.sh        # Go servers only
 ```
 
 ## ❓ Need Help?
@@ -49,24 +70,25 @@ podman compose up -d postgres redis cassandra
 podman ps
 ```
 
-### 2. Start API Server
+### 2. Start Go Servers
 ```bash
-cd server
-npm run dev
+./start-go-servers.sh
 ```
 
 Wait for:
 ```
-✅ Server running on http://localhost:3000
-📊 Health check: http://localhost:3000/health
-🔌 WebSocket server ready
+✅ API Server started on http://localhost:8080
+✅ Game Server started on http://localhost:8081
 ```
 
 ### 3. Test It Works
 In a new terminal:
 ```bash
-# Check health
-curl http://localhost:3000/health
+# Check API health
+curl http://localhost:8080/health
+
+# Check Game server health
+curl http://localhost:8081/health
 
 # Should see: {"status":"healthy",...}
 ```
@@ -93,44 +115,40 @@ podman compose up -d prometheus grafana redis-exporter postgres-exporter
 ### First Time Setup
 ```bash
 cd load-tests
-npm install
-npm run setup  # Creates 5 test users
+make load-test-setup  # Creates test users
 ```
 
 ### Run Tests
 ```bash
 # Quick test (5 clients, 10 seconds)
-NUM_CLIENTS=5 TEST_DURATION=10 npm run test:websocket
+make load-test-quick
 
 # Full API test
-npm run test:api
+make load-test-api
 
 # All tests
-npm run test:all
+make load-test-all
 ```
 
 ## 🔴 Stop Everything
 
 ```bash
-# Interactive stop (prompts for confirmation)
-./tank.sh stop
+# Stop everything (containers + Go servers)
+make stop
 
 # Or manually stop specific services
-podman compose stop
-
-# Stop and remove everything (including data)
-podman compose down -v
+make containers-stop
+make go-stop
 ```
 
 ## 📜 Available Commands
 
 ```bash
-./tank.sh setup       # First-time setup
-./tank.sh start       # Start all containers
-./tank.sh stop        # Stop all containers
-./tank.sh databases   # Start databases only
-./tank.sh monitoring  # Start monitoring only
-./tank.sh help        # Show all commands
+make help           # Show all available commands
+make start          # Start everything
+make stop           # Stop everything
+make status         # Show service status
+make dev            # Build + start (development)
 ```
 
 All scripts are located in the `./scripts/` folder.
@@ -164,57 +182,58 @@ podman logs tank-redis
 # Make sure server is running
 curl http://localhost:3000/health
 
+```bash
 # Re-create test users
-cd load-tests
-npm run setup
+make load-test-setup
+```
 ```
 
 ## Common Workflows
 
 ### Development
 ```bash
-# Terminal 1: Databases
-podman compose up -d postgres redis
+# Start everything
+make start
 
-# Terminal 2: Server with auto-reload
-cd server
-npm run dev
+# Make changes to Go code
+cd go-server/cmd/api
+# Edit files...
 
-# Make changes, server auto-restarts
+# Rebuild and restart
+make go-build
+make go-restart
 ```
 
 ### Testing
 ```bash
-# Terminal 1: Server running
-cd server && npm run dev
+# Make sure everything is running
+make status
 
-# Terminal 2: Run tests
-cd server && npm test
+# Run Go tests
+make go-test
 
-# Terminal 3: Load tests
-cd load-tests && npm run test:quick
+# Run load tests
+make load-test-quick
 ```
 
 ### Monitoring
 ```bash
 # Start everything including monitoring
-podman compose up -d
-
-# Start server
-cd server && npm run dev
+make start
 
 # Run load tests and watch Grafana
-# Open: http://localhost:3001
-cd load-tests && npm run test:all
+make monitoring-open-grafana
+make load-test-all
 ```
 
 ## Services & Ports
 
 | Service | Port | Command to Start |
 |---------|------|------------------|
-| API Server | 3000 | `cd server && npm run dev` |
-| PostgreSQL | 5432 | `podman compose up -d postgres` |
-| Redis | 6379 | `podman compose up -d redis` |
+| API Server | 8080 | `make go-start` |
+| Game Server | 8081 | `make go-start` |
+| PostgreSQL | 5432 | `make containers-start` |
+| Redis | 6379 | `make containers-start` |
 | Grafana | 3001 | `podman compose up -d grafana` |
 | Prometheus | 9090 | `podman compose up -d prometheus` |
 | pgAdmin | 8080 | `podman compose up -d pgadmin` |

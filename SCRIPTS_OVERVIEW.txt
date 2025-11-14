@@ -1,186 +1,72 @@
-╔════════════════════════════════════════════════════════════════════════╗
-║                  Tank Royale 2 - Scripts Overview                      ║
-╚════════════════════════════════════════════════════════════════════════╝
+========================================
+Tank Royale 2 - Scripts Overview
+========================================
 
-� MAIN LAUNCHER (Project Root)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚀 RECOMMENDED: ONE COMMAND TO START EVERYTHING
+===============================================
+./start-everything.sh  - Start all containers + Go servers
+./stop-everything.sh   - Stop everything
 
-./tank.sh <command>     # Main launcher - use this for everything!
+🎯 MAIN LAUNCHER (tank.sh)
+==========================
+./tank.sh setup       - First-time setup (creates all containers)
+./tank.sh start       - Start all containers
+./tank.sh stop        - Stop all containers
+./tank.sh databases   - Start databases only
+./tank.sh monitoring  - Start monitoring only
+./tank.sh go-servers  - Start Go servers only
+./tank.sh go-stop     - Stop Go servers only
+./tank.sh all         - Start everything
+./tank.sh stop-all    - Stop everything
+./tank.sh help        - Show all commands
 
-Available commands:
-  ./tank.sh setup       # First-time setup (creates everything)
-  ./tank.sh start       # Start all existing containers
-  ./tank.sh stop        # Stop all containers (keeps data)
-  ./tank.sh databases   # Start databases only
-  ./tank.sh monitoring  # Start monitoring only
-  ./tank.sh help        # Show all commands
+🎮 GO SERVER MANAGEMENT
+=======================
+./start-go-servers.sh - Start API + Game servers
+./stop-go-servers.sh  - Stop Go servers
 
-📂 SCRIPTS FOLDER (./scripts/)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📦 INDIVIDUAL SCRIPTS (in ./scripts/)
+======================================
+setup-podman.sh       - First-time setup (creates everything)
+start-all.sh          - Start all existing containers
+stop-all.sh           - Stop all containers (keeps data)
+start-databases.sh    - Start databases only
+start-monitoring.sh   - Start monitoring stack only
+commands.sh           - Display all available commands
 
-All management scripts are organized in the scripts/ folder:
+🔧 SERVICES & PORTS
+===================
+API Server:           http://localhost:8080
+Game Server:          http://localhost:8081
+Grafana:              http://localhost:3001 (admin/admin123)
+Prometheus:           http://localhost:9090
+pgAdmin:              http://localhost:5050 (admin@tankroyale.com/admin123)
+Redis Commander:      http://localhost:8082
+PostgreSQL:           localhost:5432
+Redis:                localhost:6379
+Cassandra:            localhost:9042
 
-scripts/
-├── README.md               # Scripts documentation
-├── setup-podman.sh         # First-time setup
-├── start-all.sh            # Daily startup
-├── stop-all.sh             # Clean shutdown
-├── start-databases.sh      # Databases only
-├── start-monitoring.sh     # Monitoring only
-└── commands.sh             # Quick reference
+📝 LOGS
+=======
+Go API Server:        /tmp/tank-api.log
+Go Game Server:       /tmp/tank-game.log
+Container logs:       podman logs -f <container-name>
 
-�📦 CONTAINER MANAGEMENT SCRIPTS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 TYPICAL WORKFLOW
+===================
+# Morning - Start work
+./start-everything.sh
 
-1. ./setup-podman.sh (First Time Setup)
-   ┌─────────────────────────────────────────────────────────────────┐
-   │ Creates volumes, networks, pulls images, starts all containers  │
-   │ Waits for health checks, displays service URLs                  │
-   │ Run time: 3-5 minutes (first time)                              │
-   │                                                                  │
-   │ When to use:                                                     │
-   │  ✓ First time setup                                             │
-   │  ✓ After 'podman compose down -v'                               │
-   │  ✓ Starting completely fresh                                    │
-   └─────────────────────────────────────────────────────────────────┘
+# Do development...
 
-2. ./start-all.sh (Daily Development)
-   ┌─────────────────────────────────────────────────────────────────┐
-   │ Starts all existing containers with health checks               │
-   │ Displays container status and service URLs                      │
-   │ Run time: 20-30 seconds                                         │
-   │                                                                  │
-   │ When to use:                                                     │
-   │  ✓ Daily development (after stopping yesterday)                │
-   │  ✓ After running ./stop-all.sh                                 │
-   │  ✓ After system reboot                                          │
-   └─────────────────────────────────────────────────────────────────┘
+# Evening - Stop work
+./stop-everything.sh
 
-3. ./stop-all.sh (Clean Shutdown)
-   ┌─────────────────────────────────────────────────────────────────┐
-   │ Stops all Tank Royale containers with confirmation             │
-   │ Preserves all data in volumes                                   │
-   │ Run time: 5-10 seconds                                          │
-   │                                                                  │
-   │ When to use:                                                     │
-   │  ✓ End of work session                                          │
-   │  ✓ Need to free up system resources                             │
-   │  ✓ Before system shutdown                                       │
-   └─────────────────────────────────────────────────────────────────┘
-
-4. ./start-databases.sh (Databases Only)
-   ┌─────────────────────────────────────────────────────────────────┐
-   │ Starts PostgreSQL, Redis, Cassandra only                       │
-   │ Skips monitoring and admin tools                                │
-   │ Run time: 60-90 seconds (Cassandra is slow)                    │
-   │                                                                  │
-   │ When to use:                                                     │
-   │  ✓ Only need databases for development                          │
-   │  ✓ Don't need monitoring overhead                               │
-   │  ✓ Running on limited resources                                 │
-   └─────────────────────────────────────────────────────────────────┘
-
-5. ./start-monitoring.sh (Monitoring Only)
-   ┌─────────────────────────────────────────────────────────────────┐
-   │ Starts Prometheus, Grafana, and exporters                      │
-   │ Assumes databases are already running                           │
-   │ Run time: 10-15 seconds                                         │
-   │                                                                  │
-   │ When to use:                                                     │
-   │  ✓ Databases running, want to add monitoring                   │
-   │  ✓ Testing monitoring configuration                             │
-   │  ✓ Need metrics visualization                                   │
-   └─────────────────────────────────────────────────────────────────┘
-
-6. ./commands.sh (Quick Reference)
-   ┌─────────────────────────────────────────────────────────────────┐
-   │ Displays formatted list of all available commands              │
-   │ Shows service URLs and credentials                              │
-   │ Links to documentation                                          │
-   │                                                                  │
-   │ Run anytime you need a quick reminder                           │
-   └─────────────────────────────────────────────────────────────────┘
-
-🌐 SERVICE URLS & PORTS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Databases:
-  PostgreSQL      localhost:5432   (tank_user / dev_password_123)
-  Redis           localhost:6379   (no auth)
-  Cassandra       localhost:9042   (tank_royale keyspace)
-
-Admin Tools:
-  pgAdmin         http://localhost:8080   (admin@tankroyale.com / admin123)
-  Redis Commander http://localhost:8081   (no auth)
-
-Monitoring:
-  Grafana         http://localhost:3001   (admin / admin123)
-  Prometheus      http://localhost:9090   (no auth)
-
-Metrics Exporters:
-  Redis           http://localhost:9121/metrics
-  PostgreSQL      http://localhost:9187/metrics
-  Node            http://localhost:9100/metrics
-
-Application:
-  API Server      http://localhost:3000   (start with: cd server && npm run dev)
-  Server Metrics  http://localhost:3000/metrics
-
-📊 CONTAINER STATUS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-After running ./start-all.sh, you should see 10 containers:
-
-  1. tank-postgres           (Database)
-  2. tank-redis              (Cache/Queue)
-  3. tank-cassandra          (Time-series data)
-  4. tank-pgadmin            (PostgreSQL GUI)
-  5. tank-redis-commander    (Redis GUI)
-  6. tank-prometheus         (Metrics collection)
-  7. tank-grafana            (Metrics visualization)
-  8. tank-redis-exporter     (Redis metrics → Prometheus)
-  9. tank-postgres-exporter  (PostgreSQL metrics → Prometheus)
- 10. tank-node-exporter      (System metrics → Prometheus)
-
-Check status: podman ps --format "{{.Names}}\t{{.Status}}"
-
-📚 DOCUMENTATION FILES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-START_HERE.md           → Complete setup guide (start here!)
-GETTING_STARTED.md      → Quick start for daily development
-CONTAINER_SCRIPTS.md    → Detailed script documentation + FAQ
-LOAD_TESTING_SETUP.md   → Load testing guide and best practices
-QUICK_COMMANDS.md       → Command reference
-README.md               → Project overview
-
-📁 TYPICAL WORKFLOWS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-First Time:
-  1. ./setup-podman.sh
-  2. cd server && npm install && npm run dev
-  3. cd load-tests && npm install && node setup-test-users.js
-  4. cd load-tests && npm run test:quick
-
-Daily Development:
-  Morning:  ./start-all.sh
-  Work:     cd server && npm run dev
-  Test:     cd load-tests && npm run test:quick
-  Evening:  ./stop-all.sh
-
-Testing & Monitoring:
-  1. ./start-all.sh
-  2. Open http://localhost:3001 (Grafana)
-  3. cd server && npm run dev
-  4. cd load-tests && npm run test:all
-  5. Watch metrics in Grafana
-
-Clean Slate:
-  1. podman compose down -v  (⚠️ deletes data)
-  2. ./setup-podman.sh
-  3. cd load-tests && node setup-test-users.js
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Run './commands.sh' anytime for a quick reference!
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📖 DOCUMENTATION
+================
+README.md             - Quick overview
+START_HERE.md         - Complete setup guide
+BOOT_COMMANDS.md      - Boot commands reference
+QUICK_COMMANDS.md     - Common commands
+GETTING_STARTED.md    - Detailed getting started
+GO_MIGRATION_*        - Go migration documentation

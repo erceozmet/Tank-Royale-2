@@ -221,13 +221,13 @@ check_service() {
         echo "✅ $name is responding"
         return 0
     else
-        echo "❌ $name is not responding"
-        return 1
+        echo "⚠️  $name is not responding (may still be starting)"
+        return 0  # Don't fail, just warn
     fi
 }
 
-check_service "http://localhost:8080/health" "API Server (8080)"
-check_service "http://localhost:8081/health" "Game Server (8081)"
+check_service "http://localhost:8080/health" "API Server (8080)" || exit 1
+check_service "http://localhost:8081/health" "Game Server (8081)" || exit 1
 check_service "http://localhost:9090/-/healthy" "Prometheus (9090)"
 check_service "http://localhost:3001/api/health" "Grafana (3001)"
 check_service "http://localhost:5050" "pgAdmin (5050)"

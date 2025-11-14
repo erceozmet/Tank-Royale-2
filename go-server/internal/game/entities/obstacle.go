@@ -18,9 +18,9 @@ type Obstacle struct {
 	Width    float64      `json:"width"`
 	Height   float64      `json:"height"`
 	Type     ObstacleType `json:"type"`
-	Health   int          `json:"health"`       // For destructible obstacles
-	IsStatic bool         `json:"isStatic"`     // If true, cannot be destroyed
-	Rotation float64      `json:"rotation"`     // Rotation in radians
+	Health   int          `json:"health"`   // For destructible obstacles
+	IsStatic bool         `json:"isStatic"` // If true, cannot be destroyed
+	Rotation float64      `json:"rotation"` // Rotation in radians
 }
 
 // NewObstacle creates a new obstacle

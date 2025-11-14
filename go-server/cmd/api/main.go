@@ -14,6 +14,7 @@ import (
 	"github.com/erceozmet/tank-royale-2/go-server/internal/config"
 	"github.com/erceozmet/tank-royale-2/go-server/internal/db/postgres"
 	"github.com/erceozmet/tank-royale-2/go-server/internal/db/redis"
+	"github.com/erceozmet/tank-royale-2/go-server/internal/game/matchmaking"
 	"github.com/erceozmet/tank-royale-2/go-server/internal/handlers"
 	appMiddleware "github.com/erceozmet/tank-royale-2/go-server/internal/middleware"
 	"github.com/erceozmet/tank-royale-2/go-server/internal/repositories"
@@ -69,6 +70,14 @@ func main() {
 
 	// Initialize session manager
 	sessionManager := cache.NewSessionManager(redisDB.Client)
+
+	// Initialize matchmaking service
+	matchmakingService := matchmaking.NewMatchmakingService(pgDB, redisDB)
+	if err := matchmakingService.Start(); err != nil {
+		logger.Logger.Fatal().Err(err).Msg("Failed to start matchmaking service")
+	}
+	defer matchmakingService.Stop()
+	logger.Logger.Info().Msg("Matchmaking service started")
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(userRepo, sessionManager)
@@ -173,6 +182,9 @@ func main() {
 				r.Get("/me", authHandler.Me)
 			})
 		})
+
+		// Matchmaking routes
+		matchmaking.RegisterRoutes(r, matchmakingService)
 
 		// Leaderboard routes (TODO: implement in Phase 2)
 		r.Get("/leaderboard", func(w http.ResponseWriter, r *http.Request) {

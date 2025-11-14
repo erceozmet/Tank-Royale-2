@@ -4,12 +4,12 @@ package entities
 type LootType string
 
 const (
-	LootWeaponRifle     LootType = "weapon_rifle"
-	LootWeaponShotgun   LootType = "weapon_shotgun"
-	LootWeaponSniper    LootType = "weapon_sniper"
-	LootShield          LootType = "shield"
-	LootDamageBoost     LootType = "damage_boost"
-	LootFireRateBoost   LootType = "fire_rate_boost"
+	LootWeaponRifle   LootType = "weapon_rifle"
+	LootWeaponShotgun LootType = "weapon_shotgun"
+	LootWeaponSniper  LootType = "weapon_sniper"
+	LootShield        LootType = "shield"
+	LootDamageBoost   LootType = "damage_boost"
+	LootFireRateBoost LootType = "fire_rate_boost"
 )
 
 // Loot represents a collectible item (inside crates)

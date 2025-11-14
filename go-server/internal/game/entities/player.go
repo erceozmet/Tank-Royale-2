@@ -21,10 +21,10 @@ type Player struct {
 	Velocity Vector2D `json:"velocity"`
 
 	// Health system
-	Health       int `json:"health"`        // Base health (max 100)
-	Shield       int `json:"shield"`        // Shield health (max 150, stacks of 50)
-	MaxShield    int `json:"maxShield"`     // Current max shield capacity
-	ShieldStacks int `json:"shieldStacks"`  // Number of shield upgrades (max 3)
+	Health       int `json:"health"`       // Base health (max 100)
+	Shield       int `json:"shield"`       // Shield health (max 150, stacks of 50)
+	MaxShield    int `json:"maxShield"`    // Current max shield capacity
+	ShieldStacks int `json:"shieldStacks"` // Number of shield upgrades (max 3)
 
 	// Combat
 	CurrentWeapon WeaponType `json:"currentWeapon"`
