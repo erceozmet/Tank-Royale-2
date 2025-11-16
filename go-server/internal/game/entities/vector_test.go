@@ -1,5 +1,4 @@
 package entities
-package entities
 
 import (
 	"math"

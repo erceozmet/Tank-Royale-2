@@ -1,5 +1,4 @@
 package loot
-package loot
 
 import (
 	"testing"

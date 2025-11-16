@@ -197,15 +197,45 @@ sleep 1
 echo "🚀 Starting API server..."
 /tmp/api-server > /tmp/api-server.log 2>&1 &
 API_PID=$!
+echo $API_PID > /tmp/tank-api.pid
 echo "✅ API server started (PID: $API_PID)"
 
 # Start Game server
 echo "🚀 Starting Game server..."
 /tmp/game-server > /tmp/game-server.log 2>&1 &
 GAME_PID=$!
+echo $GAME_PID > /tmp/tank-game.pid
 echo "✅ Game server started (PID: $GAME_PID)"
 
 # Wait for servers to start
+sleep 3
+
+# Step 5: Start Frontend Dev Server
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🎨 Step 5: Starting Frontend Dev Server"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+# Stop any existing frontend server
+lsof -ti :5173 | xargs kill -9 2>/dev/null || true
+sleep 1
+
+# Check if node_modules exists, if not install dependencies
+if [ ! -d "$PROJECT_ROOT/client/node_modules" ]; then
+    echo "📦 Installing frontend dependencies..."
+    cd "$PROJECT_ROOT/client"
+    npm install
+fi
+
+# Start Vite dev server
+echo "🚀 Starting Vite dev server..."
+cd "$PROJECT_ROOT/client"
+npm run dev > /tmp/vite-server.log 2>&1 &
+VITE_PID=$!
+echo $VITE_PID > /tmp/tank-vite.pid
+echo "✅ Vite dev server started (PID: $VITE_PID)"
+
+# Wait for Vite to start
 sleep 3
 
 # Verify servers are running
@@ -228,6 +258,7 @@ check_service() {
 
 check_service "http://localhost:8080/health" "API Server (8080)" || exit 1
 check_service "http://localhost:8081/health" "Game Server (8081)" || exit 1
+check_service "http://localhost:5173" "Vite Dev Server (5173)"
 check_service "http://localhost:9090/-/healthy" "Prometheus (9090)"
 check_service "http://localhost:3001/api/health" "Grafana (3001)"
 check_service "http://localhost:5050" "pgAdmin (5050)"
@@ -238,6 +269,7 @@ echo "║                  ✅ ALL SERVICES STARTED ✅                  ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo ""
 echo "📍 Service URLs:"
+echo "   • Frontend:       http://localhost:5173"
 echo "   • API Server:     http://localhost:8080"
 echo "   • Game Server:    http://localhost:8081"
 echo "   • Prometheus:     http://localhost:9090"
@@ -250,6 +282,7 @@ echo "   • Database Test:  curl http://localhost:8080/api/test/db"
 echo "   • View Metrics:   curl http://localhost:8080/metrics"
 echo ""
 echo "📝 Logs:"
+echo "   • Frontend:       tail -f /tmp/vite-server.log"
 echo "   • API Server:     tail -f /tmp/api-server.log"
 echo "   • Game Server:    tail -f /tmp/game-server.log"
 echo ""

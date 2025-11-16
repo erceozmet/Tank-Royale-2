@@ -1,0 +1,54 @@
+{
+  "name": "blast-io-client",
+  "version": "1.0.0",
+  "description": "blast.io - Minimalist Battle Royale Game",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src --ext .ts,.tsx",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.23.24",
+    "phaser": "^3.80.1",
+    "tailwind-merge": "^3.4.0"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@types/node": "^20.10.6",
+    "@typescript-eslint/eslint-plugin": "^6.18.1",
+    "@typescript-eslint/parser": "^6.18.1",
+    "@vitest/coverage-v8": "^4.0.9",
+    "@vitest/ui": "^4.0.9",
+    "autoprefixer": "^10.4.22",
+    "eslint": "^8.56.0",
+    "happy-dom": "^20.0.10",
+    "jsdom": "^27.2.0",
+    "postcss": "^8.5.6",
+    "prettier": "^3.1.1",
+    "tailwindcss": "^4.1.17",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.8",
+    "vite-plugin-static-copy": "^1.0.0",
+    "vitest": "^4.0.9"
+  },
+  "keywords": [
+    "blast.io",
+    "io-game",
+    "battle-royale",
+    "phaser",
+    "multiplayer",
+    "typescript"
+  ],
+  "author": "blast.io Team",
+  "license": "MIT"
+}

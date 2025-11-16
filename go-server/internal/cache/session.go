@@ -38,45 +38,45 @@ const (
 // SetSession stores a user session in Redis with 7-day TTL
 func (sm *SessionManager) SetSession(ctx context.Context, userID string, data SessionData) error {
 	key := fmt.Sprintf("%s%s", sessionPrefix, userID)
-	
+
 	// Set timestamps
 	now := time.Now()
 	if data.CreatedAt.IsZero() {
 		data.CreatedAt = now
 	}
 	data.LastSeen = now
-	
+
 	// Serialize session data
 	sessionJSON, err := json.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("failed to marshal session data: %w", err)
 	}
-	
+
 	// Track cache operation duration
 	start := time.Now()
-	
+
 	// Store with TTL
 	if err := sm.client.Set(ctx, key, sessionJSON, sessionTTL).Err(); err != nil {
 		return fmt.Errorf("failed to set session in Redis: %w", err)
 	}
-	
+
 	duration := time.Since(start).Seconds()
 	metrics.CacheOperationDuration.WithLabelValues("set", "session").Observe(duration)
-	
+
 	return nil
 }
 
 // GetSession retrieves a user session from Redis
 func (sm *SessionManager) GetSession(ctx context.Context, userID string) (*SessionData, error) {
 	key := fmt.Sprintf("%s%s", sessionPrefix, userID)
-	
+
 	start := time.Now()
 	result, err := sm.client.Get(ctx, key).Result()
 	duration := time.Since(start).Seconds()
-	
+
 	// Track cache operation duration
 	metrics.CacheOperationDuration.WithLabelValues("get", "session").Observe(duration)
-	
+
 	if err == redis.Nil {
 		// Cache miss
 		metrics.CacheMisses.WithLabelValues("session").Inc()
@@ -85,38 +85,38 @@ func (sm *SessionManager) GetSession(ctx context.Context, userID string) (*Sessi
 	if err != nil {
 		return nil, fmt.Errorf("failed to get session from Redis: %w", err)
 	}
-	
+
 	// Cache hit
 	metrics.CacheHits.WithLabelValues("session").Inc()
-	
+
 	var session SessionData
 	if err := json.Unmarshal([]byte(result), &session); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal session data: %w", err)
 	}
-	
+
 	return &session, nil
 }
 
 // DeleteSession removes a user session from Redis (logout)
 func (sm *SessionManager) DeleteSession(ctx context.Context, userID string) error {
 	key := fmt.Sprintf("%s%s", sessionPrefix, userID)
-	
+
 	start := time.Now()
-	
+
 	if err := sm.client.Del(ctx, key).Err(); err != nil {
 		return fmt.Errorf("failed to delete session from Redis: %w", err)
 	}
-	
+
 	duration := time.Since(start).Seconds()
 	metrics.CacheOperationDuration.WithLabelValues("delete", "session").Observe(duration)
-	
+
 	return nil
 }
 
 // RefreshSession extends the TTL of a user session
 func (sm *SessionManager) RefreshSession(ctx context.Context, userID string) error {
 	key := fmt.Sprintf("%s%s", sessionPrefix, userID)
-	
+
 	// Check if session exists
 	exists, err := sm.client.Exists(ctx, key).Result()
 	if err != nil {
@@ -125,7 +125,7 @@ func (sm *SessionManager) RefreshSession(ctx context.Context, userID string) err
 	if exists == 0 {
 		return fmt.Errorf("session not found for user %s", userID)
 	}
-	
+
 	// Get current session data
 	session, err := sm.GetSession(ctx, userID)
 	if err != nil {
@@ -134,10 +134,10 @@ func (sm *SessionManager) RefreshSession(ctx context.Context, userID string) err
 	if session == nil {
 		return fmt.Errorf("session not found for user %s", userID)
 	}
-	
+
 	// Update last seen timestamp
 	session.LastSeen = time.Now()
-	
+
 	// Save with refreshed TTL
 	return sm.SetSession(ctx, userID, *session)
 }
@@ -145,24 +145,24 @@ func (sm *SessionManager) RefreshSession(ctx context.Context, userID string) err
 // SessionExists checks if a session exists for the given user ID
 func (sm *SessionManager) SessionExists(ctx context.Context, userID string) (bool, error) {
 	key := fmt.Sprintf("%s%s", sessionPrefix, userID)
-	
+
 	exists, err := sm.client.Exists(ctx, key).Result()
 	if err != nil {
 		return false, fmt.Errorf("failed to check session existence: %w", err)
 	}
-	
+
 	return exists > 0, nil
 }
 
 // GetSessionTTL returns the remaining TTL for a session
 func (sm *SessionManager) GetSessionTTL(ctx context.Context, userID string) (time.Duration, error) {
 	key := fmt.Sprintf("%s%s", sessionPrefix, userID)
-	
+
 	ttl, err := sm.client.TTL(ctx, key).Result()
 	if err != nil {
 		return 0, fmt.Errorf("failed to get session TTL: %w", err)
 	}
-	
+
 	return ttl, nil
 }
 
@@ -172,16 +172,16 @@ func (sm *SessionManager) DeleteAllUserSessions(ctx context.Context) (int64, err
 	var cursor uint64
 	var deletedCount int64
 	pattern := fmt.Sprintf("%s*", sessionPrefix)
-	
+
 	for {
 		var keys []string
 		var err error
-		
+
 		keys, cursor, err = sm.client.Scan(ctx, cursor, pattern, 100).Result()
 		if err != nil {
 			return deletedCount, fmt.Errorf("failed to scan session keys: %w", err)
 		}
-		
+
 		if len(keys) > 0 {
 			deleted, err := sm.client.Del(ctx, keys...).Result()
 			if err != nil {
@@ -189,12 +189,12 @@ func (sm *SessionManager) DeleteAllUserSessions(ctx context.Context) (int64, err
 			}
 			deletedCount += deleted
 		}
-		
+
 		if cursor == 0 {
 			break
 		}
 	}
-	
+
 	return deletedCount, nil
 }
 
@@ -203,27 +203,27 @@ func (sm *SessionManager) GetActiveSessions(ctx context.Context) ([]string, erro
 	var cursor uint64
 	var userIDs []string
 	pattern := fmt.Sprintf("%s*", sessionPrefix)
-	
+
 	for {
 		var keys []string
 		var err error
-		
+
 		keys, cursor, err = sm.client.Scan(ctx, cursor, pattern, 100).Result()
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan session keys: %w", err)
 		}
-		
+
 		// Extract user IDs from keys (remove prefix)
 		for _, key := range keys {
 			userID := key[len(sessionPrefix):]
 			userIDs = append(userIDs, userID)
 		}
-		
+
 		if cursor == 0 {
 			break
 		}
 	}
-	
+
 	return userIDs, nil
 }
 

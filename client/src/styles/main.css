@@ -1,0 +1,219 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Orbitron:wght@600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base styles */
+@layer base {
+  * {
+    @apply antialiased;
+  }
+
+  html, body {
+    @apply h-full w-full m-0 p-0 overflow-hidden;
+  }
+
+  body {
+    @apply bg-white text-gray-900 font-sans;
+    /* White grid background pattern */
+    background-image: 
+      linear-gradient(to right, #e5e7eb 1px, transparent 1px),
+      linear-gradient(to bottom, #e5e7eb 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  #root {
+    @apply h-full w-full;
+  }
+}
+
+/* Custom components */
+@layer components {
+  /* Glass morphism button */
+  .btn-glass {
+    @apply bg-white/80 backdrop-blur-sm border border-gray-200 
+           hover:bg-white hover:shadow-lg hover:scale-105 
+           transition-all duration-200 ease-out;
+  }
+
+  /* Primary action button */
+  .btn-primary {
+    @apply bg-blue-500 hover:bg-blue-600 text-white 
+           shadow-lg hover:shadow-xl hover:scale-105 
+           transition-all duration-200 ease-out;
+  }
+
+  /* Danger button */
+  .btn-danger {
+    @apply bg-red-500 hover:bg-red-600 text-white 
+           shadow-lg hover:shadow-xl hover:scale-105 
+           transition-all duration-200 ease-out;
+  }
+
+  /* Input field with elegant styling */
+  .input-elegant {
+    @apply bg-white/80 backdrop-blur-sm border-2 border-gray-200 
+           focus:border-blue-500 focus:ring-2 focus:ring-blue-200 
+           rounded-lg px-4 py-3 outline-none transition-all duration-200;
+  }
+
+  /* Card container */
+  .card-elegant {
+    @apply bg-white/90 backdrop-blur-md border border-gray-200 
+           rounded-2xl shadow-xl p-6;
+  }
+
+  /* HUD element styling */
+  .hud-element {
+    @apply bg-white/90 backdrop-blur-md border border-gray-300 
+           rounded-xl shadow-lg;
+  }
+
+  /* Player circle (will be used in canvas, but defining colors here) */
+  .player-circle {
+    @apply rounded-full shadow-lg;
+  }
+
+  /* Minimap styling */
+  .minimap {
+    @apply bg-white/90 backdrop-blur-md border-2 border-gray-300 
+           rounded-xl shadow-xl overflow-hidden;
+  }
+
+  /* Controls display */
+  .controls-display {
+    @apply bg-white/80 backdrop-blur-sm border border-gray-200 
+           rounded-lg p-4 text-sm font-mono;
+  }
+
+  /* Zone warning */
+  .zone-warning {
+    @apply bg-orange-500 text-white px-6 py-3 rounded-full 
+           shadow-lg animate-pulse-slow font-semibold;
+  }
+
+  /* Health bar */
+  .health-bar {
+    @apply bg-gray-200 rounded-full overflow-hidden h-4 relative;
+  }
+
+  .health-bar-fill {
+    @apply h-full transition-all duration-300 ease-out rounded-full;
+  }
+}
+
+/* Utility classes */
+@layer utilities {
+  /* Smooth fade in animation */
+  .fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Slide in from left */
+  .slide-in-left {
+    animation: slideInLeft 0.4s ease-out;
+  }
+
+  @keyframes slideInLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  /* Slide in from right */
+  .slide-in-right {
+    animation: slideInRight 0.4s ease-out;
+  }
+
+  @keyframes slideInRight {
+    from {
+      opacity: 0;
+      transform: translateX(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  /* Pulse glow effect */
+  .pulse-glow {
+    animation: pulseGlow 2s ease-in-out infinite;
+  }
+
+  @keyframes pulseGlow {
+    0%, 100% {
+      box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+    }
+    50% {
+      box-shadow: 0 0 40px rgba(59, 130, 246, 0.6);
+    }
+  }
+
+  /* No select (for game UI) */
+  .no-select {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+
+  /* Custom scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-gray-100 rounded-full;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 rounded-full hover:bg-gray-400;
+  }
+}
+
+/* Game-specific styles */
+.game-canvas {
+  @apply absolute inset-0 z-0;
+}
+
+.game-ui-overlay {
+  @apply absolute inset-0 z-10 pointer-events-none;
+}
+
+.game-ui-overlay > * {
+  @apply pointer-events-auto;
+}
+
+/* Logo styling */
+.blast-logo {
+  font-family: 'Orbitron', sans-serif;
+  @apply text-5xl font-black tracking-tight;
+  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 0 2px 20px rgba(59, 130, 246, 0.3);
+}
+
+/* Loading spinner */
+.spinner {
+  @apply inline-block w-8 h-8 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin;
+}

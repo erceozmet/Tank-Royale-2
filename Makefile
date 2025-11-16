@@ -151,10 +151,10 @@ start: ## 🚀 Start everything (containers + Go servers)
 	@echo "$(BLUE)╔══════════════════════════════════════════════════════════════╗$(NC)"
 	@echo "$(BLUE)║          Starting Tank Royale 2 - Everything               ║$(NC)"
 	@echo "$(BLUE)╚══════════════════════════════════════════════════════════════╝$(NC)"
-	@./scripts/start-all.sh
+	@./scripts/start-all.sh || true
 	@echo ""
 	@echo "$(BLUE)Starting Go Servers...$(NC)"
-	@./scripts/start-go-servers.sh
+	@./scripts/start-go-servers.sh || true
 	@echo ""
 	@$(MAKE) status
 

@@ -12,6 +12,13 @@ echo "🛑 Stopping Go servers..."
 lsof -ti :8080 | xargs kill -9 2>/dev/null && echo "  ✅ API server stopped" || echo "  ℹ️  API server not running"
 lsof -ti :8081 | xargs kill -9 2>/dev/null && echo "  ✅ Game server stopped" || echo "  ℹ️  Game server not running"
 
+# Stop Frontend dev server
+echo "🛑 Stopping frontend dev server..."
+lsof -ti :5173 | xargs kill -9 2>/dev/null && echo "  ✅ Vite dev server stopped" || echo "  ℹ️  Vite dev server not running"
+
+# Remove PID files
+rm -f /tmp/tank-api.pid /tmp/tank-game.pid /tmp/tank-vite.pid
+
 echo ""
 echo "🛑 Stopping containers..."
 
