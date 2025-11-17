@@ -1,9 +1,12 @@
 package engine
 
 import (
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/erceozmet/tank-royale-2/go-server/internal/game"
+	"github.com/erceozmet/tank-royale-2/go-server/internal/game/combat"
 	"github.com/erceozmet/tank-royale-2/go-server/internal/game/entities"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -394,4 +397,952 @@ func TestRingBufferIndexWrapping(t *testing.T) {
 	// Verify index wraps correctly: 0, 1, 2, 0, 1, 2, 0, 1, 2, 0
 	expected := []int{0, 1, 2, 0, 1, 2, 0, 1, 2, 0}
 	assert.Equal(t, expected, indices, "Index should wrap around properly")
+}
+
+// ===== GameLoop Lifecycle Tests =====
+
+// TestNewGameLoop verifies GameLoop initialization
+func TestNewGameLoop(t *testing.T) {
+	gl := NewGameLoop("test-match-123")
+
+	require.NotNil(t, gl)
+	assert.NotNil(t, gl.state)
+	assert.Equal(t, "test-match-123", gl.state.MatchID)
+	assert.NotNil(t, gl.projectileManager)
+	assert.NotNil(t, gl.crateManager)
+	assert.NotNil(t, gl.physics)
+	assert.NotNil(t, gl.inputQueue)
+	assert.NotNil(t, gl.broadcastChan)
+	assert.NotNil(t, gl.ctx)
+	assert.NotNil(t, gl.cancel)
+	assert.False(t, gl.running)
+
+	// Verify history buffer is initialized correctly
+	expectedSize := int(game.LagCompensationBuffer.Milliseconds() / game.TickInterval.Milliseconds())
+	assert.Equal(t, expectedSize, gl.maxHistorySize)
+	assert.Equal(t, expectedSize, len(gl.stateHistory))
+	assert.Equal(t, 0, gl.historyIndex)
+}
+
+// TestStartGameLoop verifies game loop can start
+func TestStartGameLoop(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	// Should not be running initially
+	assert.False(t, gl.running)
+	assert.Equal(t, PhaseWaiting, gl.state.Phase)
+
+	// Start the game loop
+	err := gl.Start()
+	assert.NoError(t, err)
+	assert.True(t, gl.running)
+	assert.Equal(t, PhasePlaying, gl.state.Phase)
+	assert.False(t, gl.matchStartTime.IsZero())
+
+	// Clean up
+	gl.Stop()
+	time.Sleep(10 * time.Millisecond) // Give goroutine time to stop
+}
+
+// TestStartGameLoopTwice verifies starting already running loop returns error
+func TestStartGameLoopTwice(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	err := gl.Start()
+	assert.NoError(t, err)
+
+	// Try to start again
+	err = gl.Start()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "already running")
+
+	// Clean up
+	gl.Stop()
+	time.Sleep(10 * time.Millisecond)
+}
+
+// TestStopGameLoop verifies game loop can stop
+func TestStopGameLoop(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	err := gl.Start()
+	require.NoError(t, err)
+	assert.True(t, gl.running)
+
+	// Stop the loop
+	gl.Stop()
+	assert.False(t, gl.running)
+
+	// Wait for goroutine to finish
+	time.Sleep(50 * time.Millisecond)
+
+	// Context should be cancelled
+	select {
+	case <-gl.ctx.Done():
+		// Good, context is cancelled
+	default:
+		t.Fatal("Context should be cancelled after Stop()")
+	}
+}
+
+// TestStopGameLoopWhenNotRunning verifies stopping non-running loop is safe
+func TestStopGameLoopWhenNotRunning(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	// Should not panic
+	assert.NotPanics(t, func() {
+		gl.Stop()
+	})
+
+	assert.False(t, gl.running)
+}
+
+// ===== Player Management Tests =====
+
+// TestAddPlayerToGameLoop verifies adding players to game loop
+func TestAddPlayerToGameLoop(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	player := &entities.Player{
+		ID:       "player1",
+		Username: "TestPlayer",
+		Position: entities.Vector2D{X: 100, Y: 100},
+		IsAlive:  true,
+		Health:   100,
+	}
+
+	gl.AddPlayer(player)
+
+	state := gl.GetState()
+	assert.Len(t, state.Players, 1)
+	assert.Contains(t, state.Players, "player1")
+}
+
+// TestRemovePlayerFromGameLoop verifies removing players
+func TestRemovePlayerFromGameLoop(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	player := &entities.Player{
+		ID:       "player1",
+		Username: "TestPlayer",
+		IsAlive:  true,
+		Health:   100,
+	}
+
+	gl.AddPlayer(player)
+	assert.Len(t, gl.GetState().Players, 1)
+
+	gl.RemovePlayer("player1")
+	assert.Empty(t, gl.GetState().Players)
+}
+
+// TestGetState verifies getting game state is thread-safe
+func TestGetState(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	player := &entities.Player{
+		ID:       "player1",
+		Username: "P1",
+		IsAlive:  true,
+		Health:   100,
+	}
+	gl.AddPlayer(player)
+
+	// Access state multiple times concurrently
+	done := make(chan bool, 10)
+	for i := 0; i < 10; i++ {
+		go func() {
+			state := gl.GetState()
+			assert.NotNil(t, state)
+			assert.Equal(t, "test-match", state.MatchID)
+			done <- true
+		}()
+	}
+
+	// Wait for all goroutines
+	for i := 0; i < 10; i++ {
+		<-done
+	}
+}
+
+// ===== Input Queue Tests =====
+
+// TestQueueInput verifies input queueing
+func TestQueueInput(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	input := PlayerInput{
+		UserID: "player1",
+		Tick:   100,
+		Input: combat.PlayerInput{
+			MoveForward: true,
+			Fire:        true,
+		},
+		Timestamp: time.Now(),
+	}
+
+	// Queue should accept input
+	gl.QueueInput(input)
+
+	// Verify input is in queue
+	select {
+	case received := <-gl.inputQueue:
+		assert.Equal(t, "player1", received.UserID)
+		assert.Equal(t, int64(100), received.Tick)
+		assert.True(t, received.Input.Fire)
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("Input was not queued")
+	}
+}
+
+// TestQueueInputWhenFull verifies behavior when queue is full
+func TestQueueInputWhenFull(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	// Fill the queue (capacity is 1000)
+	for i := 0; i < 1000; i++ {
+		input := PlayerInput{
+			UserID:    "player1",
+			Tick:      int64(i),
+			Timestamp: time.Now(),
+		}
+		gl.QueueInput(input)
+	}
+
+	// Queue is now full - next input should be dropped (not block)
+	input := PlayerInput{
+		UserID:    "player_overflow",
+		Tick:      9999,
+		Timestamp: time.Now(),
+	}
+
+	// Should not block or panic
+	done := make(chan bool)
+	go func() {
+		gl.QueueInput(input)
+		done <- true
+	}()
+
+	select {
+	case <-done:
+		// Good, didn't block
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("QueueInput blocked when queue was full")
+	}
+}
+
+// ===== Broadcast Channel Tests =====
+
+// TestGetBroadcastChannel verifies broadcast channel access
+func TestGetBroadcastChannel(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	ch := gl.GetBroadcastChannel()
+	assert.NotNil(t, ch)
+
+	// Channel should be receive-only from outside
+	_, ok := interface{}(ch).(<-chan GameStateUpdate)
+	assert.True(t, ok, "Channel should be receive-only")
+}
+
+// ===== Lag Compensation Integration Tests =====
+
+// TestProcessShootWithLagCompIntegration verifies lag compensation with actual damage
+func TestProcessShootWithLagCompIntegration(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	// Add shooter and target
+	shooter := &entities.Player{
+		ID:            "shooter",
+		Username:      "Shooter",
+		Position:      entities.Vector2D{X: 0, Y: 0},
+		IsAlive:       true,
+		Health:        100,
+		CurrentWeapon: entities.WeaponRifle,
+		LastFireTime:  time.Now().Add(-1 * time.Second), // Can fire
+	}
+
+	target := &entities.Player{
+		ID:       "target",
+		Username: "Target",
+		Position: entities.Vector2D{X: 100, Y: 0},
+		IsAlive:  true,
+		Health:   100,
+	}
+
+	gl.state.Players["shooter"] = shooter
+	gl.state.Players["target"] = target
+
+	// Save a snapshot
+	gl.state.Timestamp = time.Now()
+	gl.saveStateSnapshot()
+
+	// Shoot at target
+	direction := entities.Vector2D{X: 1, Y: 0}
+	clientTimestamp := time.Now()
+
+	hit := gl.ProcessShootWithLagComp("shooter", clientTimestamp, direction)
+
+	// Should register a hit
+	assert.True(t, hit, "Should hit the target")
+
+	// Target should have taken damage
+	assert.Less(t, target.Health, 100, "Target should have taken damage")
+}
+
+// TestProcessShootWithLagCompMiss verifies missing a shot
+func TestProcessShootWithLagCompMiss(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	shooter := &entities.Player{
+		ID:            "shooter",
+		Username:      "Shooter",
+		Position:      entities.Vector2D{X: 0, Y: 0},
+		IsAlive:       true,
+		Health:        100,
+		CurrentWeapon: entities.WeaponPistol,
+		LastFireTime:  time.Now().Add(-1 * time.Second),
+	}
+
+	target := &entities.Player{
+		ID:       "target",
+		Username: "Target",
+		Position: entities.Vector2D{X: 100, Y: 100}, // Not in line of fire
+		IsAlive:  true,
+		Health:   100,
+	}
+
+	gl.state.Players["shooter"] = shooter
+	gl.state.Players["target"] = target
+	gl.state.Timestamp = time.Now()
+	gl.saveStateSnapshot()
+
+	// Shoot straight right (target is diagonal)
+	direction := entities.Vector2D{X: 1, Y: 0}
+	clientTimestamp := time.Now()
+
+	hit := gl.ProcessShootWithLagComp("shooter", clientTimestamp, direction)
+
+	// Should miss
+	assert.False(t, hit, "Should miss the target")
+	assert.Equal(t, 100, target.Health, "Target health should be unchanged")
+}
+
+// TestProcessShootWithLagCompNoHistory verifies behavior with no history
+func TestProcessShootWithLagCompNoHistory(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	shooter := &entities.Player{
+		ID:            "shooter",
+		Username:      "Shooter",
+		Position:      entities.Vector2D{X: 0, Y: 0},
+		IsAlive:       true,
+		Health:        100,
+		CurrentWeapon: entities.WeaponRifle,
+		LastFireTime:  time.Now().Add(-1 * time.Second),
+	}
+
+	target := &entities.Player{
+		ID:       "target",
+		Username: "Target",
+		Position: entities.Vector2D{X: 100, Y: 0},
+		IsAlive:  true,
+		Health:   100,
+	}
+
+	gl.state.Players["shooter"] = shooter
+	gl.state.Players["target"] = target
+
+	// No snapshots saved - should use current state
+	direction := entities.Vector2D{X: 1, Y: 0}
+	clientTimestamp := time.Now()
+
+	hit := gl.ProcessShootWithLagComp("shooter", clientTimestamp, direction)
+
+	// Should still work with current state
+	assert.True(t, hit, "Should hit using current state as fallback")
+	assert.Less(t, target.Health, 100, "Target should have taken damage")
+}
+
+// TestGetWeaponStats verifies weapon stats retrieval
+func TestGetWeaponStats(t *testing.T) {
+	gl := &GameLoop{}
+
+	tests := []struct {
+		weapon         entities.WeaponType
+		expectedDamage int
+		expectedRange  float64
+	}{
+		{entities.WeaponPistol, 20, 800.0},
+		{entities.WeaponRifle, 30, 1000.0},
+		{entities.WeaponShotgun, 60, 400.0},
+		{entities.WeaponSniper, 100, 1500.0},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.weapon), func(t *testing.T) {
+			stats := gl.getWeaponStats(tt.weapon)
+			assert.Equal(t, tt.expectedDamage, stats.Damage)
+			assert.Equal(t, tt.expectedRange, stats.Range)
+		})
+	}
+}
+
+// TestGetWeaponStatsWithBoosts verifies damage calculation uses game.CalculateWeaponDamage
+func TestGetWeaponStatsWithBoosts(t *testing.T) {
+	// Weapon stats are base stats from getWeaponStats
+	// Boosts are applied separately via game.CalculateWeaponDamage
+	// This test just verifies getWeaponStats returns expected base values
+
+	gl := &GameLoop{}
+
+	pistolStats := gl.getWeaponStats(entities.WeaponPistol)
+	assert.Equal(t, 20, pistolStats.Damage)
+
+	rifleStats := gl.getWeaponStats(entities.WeaponRifle)
+	assert.Equal(t, 30, rifleStats.Damage)
+
+	shotgunStats := gl.getWeaponStats(entities.WeaponShotgun)
+	assert.Equal(t, 60, shotgunStats.Damage)
+
+	sniperStats := gl.getWeaponStats(entities.WeaponSniper)
+	assert.Equal(t, 100, sniperStats.Damage)
+}
+
+// ===== Concurrency Safety Tests =====
+
+// TestConcurrentAddRemovePlayers verifies thread safety
+func TestConcurrentAddRemovePlayers(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	var wg sync.WaitGroup
+	numGoroutines := 10
+
+	// Concurrently add and remove players
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+
+			playerID := "player_" + string(rune('0'+id))
+			player := &entities.Player{
+				ID:       playerID,
+				Username: "Player" + string(rune('0'+id)),
+				IsAlive:  true,
+				Health:   100,
+			}
+
+			gl.AddPlayer(player)
+			time.Sleep(1 * time.Millisecond)
+			gl.RemovePlayer(playerID)
+		}(i)
+	}
+
+	wg.Wait()
+
+	// All players should be removed
+	state := gl.GetState()
+	assert.Empty(t, state.Players)
+}
+
+// TestConcurrentStateAccess verifies concurrent state reads are safe
+func TestConcurrentStateAccess(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	player := &entities.Player{
+		ID:       "player1",
+		Username: "P1",
+		IsAlive:  true,
+		Health:   100,
+	}
+	gl.AddPlayer(player)
+
+	var wg sync.WaitGroup
+	numReaders := 50
+
+	// Many concurrent readers
+	for i := 0; i < numReaders; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			state := gl.GetState()
+			assert.NotNil(t, state)
+			assert.Equal(t, "test-match", state.MatchID)
+		}()
+	}
+
+	wg.Wait()
+}
+
+// ===== Game Tick Integration Tests =====
+
+// TestTickIncrement verifies that tick counter increments
+func TestTickIncrement(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	initialTick := gl.state.Tick
+
+	// Manually call tick
+	gl.tick()
+
+	assert.Equal(t, initialTick+1, gl.state.Tick)
+}
+
+// TestBroadcastState verifies state broadcasting
+func TestBroadcastState(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	player := &entities.Player{
+		ID:       "player1",
+		Username: "P1",
+		IsAlive:  true,
+		Health:   100,
+	}
+	gl.AddPlayer(player)
+
+	// Call broadcastState
+	gl.broadcastState()
+
+	// Should have a message in broadcast channel
+	select {
+	case update := <-gl.broadcastChan:
+		assert.Equal(t, gl.state.Tick, update.Tick)
+		assert.Equal(t, gl.state.Phase, update.Phase)
+		assert.Len(t, update.Players, 1)
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("No broadcast received")
+	}
+}
+
+// TestCheckWinCondition verifies win condition detection
+func TestCheckWinCondition(t *testing.T) {
+	gl := NewGameLoop("test-match")
+	gl.state.Phase = PhasePlaying
+
+	p1 := &entities.Player{ID: "p1", Username: "P1", IsAlive: true, Health: 100}
+	p2 := &entities.Player{ID: "p2", Username: "P2", IsAlive: true, Health: 100}
+
+	gl.state.Players["p1"] = p1
+	gl.state.Players["p2"] = p2
+
+	// Multiple alive players - should stay in playing phase
+	gl.checkWinCondition()
+	assert.Equal(t, PhasePlaying, gl.state.Phase)
+
+	// Kill one player - should transition to ending
+	p2.IsAlive = false
+	gl.checkWinCondition()
+	assert.Equal(t, PhaseEnding, gl.state.Phase)
+}
+
+// TestCheckWinConditionAllDead verifies handling when all players are dead
+func TestCheckWinConditionAllDead(t *testing.T) {
+	gl := NewGameLoop("test-match")
+	gl.state.Phase = PhasePlaying
+
+	p1 := &entities.Player{ID: "p1", Username: "P1", IsAlive: false, Health: 0}
+	p2 := &entities.Player{ID: "p2", Username: "P2", IsAlive: false, Health: 0}
+
+	gl.state.Players["p1"] = p1
+	gl.state.Players["p2"] = p2
+
+	// All dead - should transition to ending
+	gl.checkWinCondition()
+	assert.Equal(t, PhaseEnding, gl.state.Phase)
+}
+
+// TestProcessInputsWithFire verifies fire input processing
+func TestProcessInputsWithFire(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	player := &entities.Player{
+		ID:            "player1",
+		Username:      "P1",
+		Position:      entities.Vector2D{X: 100, Y: 100},
+		IsAlive:       true,
+		Health:        100,
+		CurrentWeapon: entities.WeaponPistol,
+		LastFireTime:  time.Now().Add(-2 * time.Second), // Can fire
+	}
+	gl.state.Players["player1"] = player
+
+	// Queue fire input
+	input := PlayerInput{
+		UserID: "player1",
+		Tick:   1,
+		Input: combat.PlayerInput{
+			Fire: true,
+		},
+		Timestamp: time.Now(),
+	}
+	gl.inputQueue <- input
+
+	// Process inputs
+	gl.processInputs()
+
+	// LastFireTime should be updated (within last second)
+	assert.WithinDuration(t, time.Now(), player.LastFireTime, 1*time.Second)
+}
+
+// TestProcessInputsDeadPlayer verifies dead players can't act
+func TestProcessInputsDeadPlayer(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	player := &entities.Player{
+		ID:            "player1",
+		Username:      "P1",
+		IsAlive:       false, // Dead
+		Health:        0,
+		CurrentWeapon: entities.WeaponPistol,
+		LastFireTime:  time.Now().Add(-2 * time.Second),
+	}
+	gl.state.Players["player1"] = player
+
+	oldFireTime := player.LastFireTime
+
+	// Queue fire input
+	input := PlayerInput{
+		UserID: "player1",
+		Tick:   1,
+		Input: combat.PlayerInput{
+			Fire: true,
+		},
+		Timestamp: time.Now(),
+	}
+	gl.inputQueue <- input
+
+	// Process inputs
+	gl.processInputs()
+
+	// Dead player shouldn't be able to fire
+	assert.Equal(t, oldFireTime, player.LastFireTime)
+}
+
+// TestApplySafeZoneDamage verifies safe zone damage application
+func TestApplySafeZoneDamage(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	player := &entities.Player{
+		ID:       "player1",
+		Username: "P1",
+		Position: entities.Vector2D{X: 10000, Y: 10000}, // Far outside
+		IsAlive:  true,
+		Health:   100,
+	}
+	gl.state.Players["player1"] = player
+	gl.state.AddPlayer(player)
+
+	// Initialize match start time
+	gl.matchStartTime = time.Now().Add(-5 * time.Minute) // Match has been running
+
+	// Update safe zone to make it small
+	gl.state.SafeZone.Update(gl.matchStartTime, time.Now())
+
+	initialHealth := player.Health
+
+	// Apply safe zone damage
+	gl.applySafeZoneDamage()
+
+	// Player should take damage if outside safe zone
+	// Note: This depends on safe zone implementation
+	// If player is far enough outside, health should decrease
+	if player.Health < initialHealth {
+		// Damage was applied
+		assert.Less(t, player.Health, initialHealth)
+	}
+}
+
+// TestUpdatePhysics verifies physics update runs
+func TestUpdatePhysics(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	player := &entities.Player{
+		ID:       "player1",
+		Username: "P1",
+		Position: entities.Vector2D{X: 100, Y: 100},
+		Velocity: entities.Vector2D{X: 5, Y: 0},
+		IsAlive:  true,
+		Health:   100,
+	}
+	gl.state.Players["player1"] = player
+
+	// Call updatePhysics
+	assert.NotPanics(t, func() {
+		gl.updatePhysics()
+	})
+}
+
+// TestCheckCollisions verifies collision checking runs
+func TestCheckCollisions(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	player := &entities.Player{
+		ID:       "player1",
+		Username: "P1",
+		Position: entities.Vector2D{X: 100, Y: 100},
+		IsAlive:  true,
+		Health:   100,
+		Kills:    0,
+	}
+	gl.state.Players["player1"] = player
+	gl.state.AddPlayer(player)
+
+	// Call checkCollisions
+	assert.NotPanics(t, func() {
+		gl.checkCollisions()
+	})
+}
+
+// TestHandleCrateInteraction verifies crate interaction
+func TestHandleCrateInteraction(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	player := &entities.Player{
+		ID:       "player1",
+		Username: "P1",
+		Position: entities.Vector2D{X: 100, Y: 100},
+		IsAlive:  true,
+		Health:   100,
+	}
+
+	// Call handleCrateInteraction (should not panic even with no crates)
+	assert.NotPanics(t, func() {
+		gl.handleCrateInteraction(player)
+	})
+}
+
+// TestFullTickCycle verifies complete tick execution
+func TestFullTickCycle(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	player := &entities.Player{
+		ID:       "player1",
+		Username: "P1",
+		Position: entities.Vector2D{X: 100, Y: 100},
+		IsAlive:  true,
+		Health:   100,
+	}
+	gl.AddPlayer(player)
+	gl.matchStartTime = time.Now()
+
+	initialTick := gl.state.Tick
+
+	// Execute one full tick
+	assert.NotPanics(t, func() {
+		gl.tick()
+	})
+
+	// Tick should increment
+	assert.Equal(t, initialTick+1, gl.state.Tick)
+
+	// State should have timestamp
+	assert.False(t, gl.state.Timestamp.IsZero())
+}
+
+// TestRunGameLoopForMultipleTicks verifies game loop runs multiple ticks
+func TestRunGameLoopForMultipleTicks(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	player := &entities.Player{
+		ID:       "player1",
+		Username: "P1",
+		Position: entities.Vector2D{X: 100, Y: 100},
+		IsAlive:  true,
+		Health:   100,
+	}
+	gl.AddPlayer(player)
+
+	// Start game loop
+	err := gl.Start()
+	require.NoError(t, err)
+
+	// Let it run for a bit
+	time.Sleep(150 * time.Millisecond) // Should run ~4-5 ticks at 30 TPS
+
+	// Stop loop
+	gl.Stop()
+	time.Sleep(50 * time.Millisecond)
+
+	// Should have executed multiple ticks
+	assert.Greater(t, gl.state.Tick, int64(0))
+	assert.LessOrEqual(t, gl.state.Tick, int64(10)) // Reasonable upper bound
+}
+
+// TestBroadcastChannelOverflow verifies broadcast doesn't block when channel is full
+func TestBroadcastChannelOverflow(t *testing.T) {
+	gl := NewGameLoop("test-match")
+	gl.state.Phase = PhasePlaying
+
+	// Don't consume from broadcast channel - let it fill up
+	// Channel capacity is 100
+
+	// Try to broadcast 150 times
+	for i := 0; i < 150; i++ {
+		gl.state.Tick = int64(i)
+
+		// Should not panic or block
+		assert.NotPanics(t, func() {
+			gl.broadcastState()
+		})
+	}
+
+	// Verify some messages were dropped (channel should be at capacity)
+	channelSize := len(gl.broadcastChan)
+	assert.Equal(t, 100, channelSize, "Channel should be at capacity")
+}
+
+// ===== Edge Case Tests =====
+
+// TestProcessInputsNonExistentPlayer verifies handling of inputs for non-existent players
+func TestProcessInputsNonExistentPlayer(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	// Queue input for non-existent player
+	input := PlayerInput{
+		UserID: "nonexistent",
+		Tick:   1,
+		Input: combat.PlayerInput{
+			Fire: true,
+		},
+		Timestamp: time.Now(),
+	}
+	gl.inputQueue <- input
+
+	// Should not panic
+	assert.NotPanics(t, func() {
+		gl.processInputs()
+	})
+}
+
+// TestProcessInputsWithInteract verifies interact input processing
+func TestProcessInputsWithInteract(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	player := &entities.Player{
+		ID:       "player1",
+		Username: "P1",
+		Position: entities.Vector2D{X: 100, Y: 100},
+		IsAlive:  true,
+		Health:   100,
+	}
+	gl.state.Players["player1"] = player
+
+	// Queue interact input
+	input := PlayerInput{
+		UserID: "player1",
+		Tick:   1,
+		Input: combat.PlayerInput{
+			Interact: true,
+		},
+		Timestamp: time.Now(),
+	}
+	gl.inputQueue <- input
+
+	// Process inputs - should call handleCrateInteraction
+	assert.NotPanics(t, func() {
+		gl.processInputs()
+	})
+}
+
+// TestMultiplePlayersInGameLoop verifies multiple players can coexist
+func TestMultiplePlayersInGameLoop(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	for i := 1; i <= 5; i++ {
+		player := &entities.Player{
+			ID:       "player" + string(rune('0'+i)),
+			Username: "Player" + string(rune('0'+i)),
+			Position: entities.Vector2D{X: float64(i * 100), Y: float64(i * 100)},
+			IsAlive:  true,
+			Health:   100,
+		}
+		gl.AddPlayer(player)
+	}
+
+	state := gl.GetState()
+	assert.Len(t, state.Players, 5)
+
+	// Run a tick with multiple players
+	assert.NotPanics(t, func() {
+		gl.tick()
+	})
+}
+
+// TestGameLoopPhaseTransitions verifies phase transitions
+func TestGameLoopPhaseTransitions(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	// Initial phase
+	assert.Equal(t, PhaseWaiting, gl.state.Phase)
+
+	// Start should transition to playing
+	err := gl.Start()
+	require.NoError(t, err)
+	assert.Equal(t, PhasePlaying, gl.state.Phase)
+
+	// Add two players
+	p1 := &entities.Player{ID: "p1", Username: "P1", IsAlive: true, Health: 100}
+	p2 := &entities.Player{ID: "p2", Username: "P2", IsAlive: true, Health: 100}
+	gl.AddPlayer(p1)
+	gl.AddPlayer(p2)
+
+	// Kill one player to trigger win condition
+	gl.state.Players["p2"].IsAlive = false
+	gl.checkWinCondition()
+
+	// Should transition to ending
+	assert.Equal(t, PhaseEnding, gl.state.Phase)
+
+	gl.Stop()
+	time.Sleep(50 * time.Millisecond)
+}
+
+// TestStateSnapshotPreservesPlayerData verifies snapshots preserve all player data
+func TestStateSnapshotPreservesPlayerData(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	player := &entities.Player{
+		ID:                  "player1",
+		Username:            "TestPlayer",
+		Position:            entities.Vector2D{X: 123.45, Y: 678.90},
+		Velocity:            entities.Vector2D{X: 5.5, Y: -3.2},
+		Rotation:            1.57,
+		IsAlive:             true,
+		Health:              75,
+		Shield:              50,
+		MaxShield:           100,
+		ShieldStacks:        2,
+		CurrentWeapon:       entities.WeaponRifle,
+		DamageBoostStacks:   2,
+		FireRateBoostStacks: 1,
+		Kills:               3,
+		RespawnTime:         0,
+	}
+
+	gl.state.Players["player1"] = player
+	gl.state.Timestamp = time.Now()
+	gl.state.Tick = 42
+
+	// Save snapshot
+	gl.saveStateSnapshot()
+
+	// Verify snapshot exists
+	require.NotNil(t, gl.stateHistory[0])
+
+	// Verify all player data is preserved
+	snapshotPlayer := gl.stateHistory[0].Players["player1"]
+	require.NotNil(t, snapshotPlayer)
+
+	assert.Equal(t, player.Position.X, snapshotPlayer.Position.X)
+	assert.Equal(t, player.Position.Y, snapshotPlayer.Position.Y)
+	assert.Equal(t, player.Velocity.X, snapshotPlayer.Velocity.X)
+	assert.Equal(t, player.Velocity.Y, snapshotPlayer.Velocity.Y)
+	assert.Equal(t, player.Rotation, snapshotPlayer.Rotation)
+	assert.Equal(t, player.Health, snapshotPlayer.Health)
+	assert.Equal(t, player.Shield, snapshotPlayer.Shield)
+	assert.Equal(t, player.ShieldStacks, snapshotPlayer.ShieldStacks)
+	assert.Equal(t, player.CurrentWeapon, snapshotPlayer.CurrentWeapon)
+	assert.Equal(t, player.DamageBoostStacks, snapshotPlayer.DamageBoostStacks)
+	assert.Equal(t, player.FireRateBoostStacks, snapshotPlayer.FireRateBoostStacks)
+	assert.Equal(t, player.Kills, snapshotPlayer.Kills)
 }

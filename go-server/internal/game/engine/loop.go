@@ -500,7 +500,7 @@ func (gl *GameLoop) ProcessShootWithLagComp(userID string, clientTimestamp time.
 
 			// Apply damage
 			died := victim.TakeDamage(damage)
-			
+
 			if died {
 				shooter.Kills++
 				gl.state.UpdatePlayerRanking(userID, shooter.Kills, 0, shooter.IsAlive)
