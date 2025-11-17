@@ -24,20 +24,20 @@ Tank Royale 2 is a real-time multiplayer battle royale game designed to showcase
 ┌────────────────────────────▼────────────────────────────────────┐
 │                       API/GATEWAY LAYER                          │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │  Node.js + Express + Socket.io                           │  │
+│  │  Go + Chi Router + Gorilla WebSocket                     │  │
 │  │  - Authentication (JWT)                                  │  │
 │  │  - WebSocket connection management                       │  │
 │  │  - Matchmaking queue management                          │  │
 │  │  - Lobby assignment                                      │  │
-│  │  - Load balancing to worker threads                      │  │
+│  │  - Load balancing to goroutines                          │  │
 │  └──┬────────────────────┬──────────────────┬───────────────┘  │
 └─────┼────────────────────┼──────────────────┼──────────────────┘
       │                    │                  │
-      │ Worker Thread Pool │                  │
+      │ Goroutine Pool     │                  │
       │ (Game Loops)       │                  │
       │                    │                  │
 ┌─────▼────────┐  ┌────────▼──────┐  ┌───────▼────────┐
-│  Worker 1    │  │   Worker 2    │  │   Worker N     │
+│  Goroutine 1 │  │  Goroutine 2  │  │  Goroutine N   │
 │  (Lobby 1-3) │  │  (Lobby 4-6)  │  │  (Lobby N-M)   │
 ├──────────────┤  ├───────────────┤  ├────────────────┤
 │ Game Loop    │  │  Game Loop    │  │  Game Loop     │
@@ -76,7 +76,7 @@ Tank Royale 2 is a real-time multiplayer battle royale game designed to showcase
 
 ### 1. Client (Frontend)
 
-**Technology**: TypeScript + Phaser.js + Socket.io-client
+**Technology**: TypeScript + Phaser.js + WebSocket client
 
 **Responsibilities**:
 - Render game at 60 FPS
@@ -119,13 +119,13 @@ client/
 
 ### 2. API/Gateway Server
 
-**Technology**: Node.js + Express + Socket.io
+**Technology**: Go + Chi Router + Gorilla WebSocket
 
 **Responsibilities**:
 - HTTP REST API for auth, leaderboards, match history
 - WebSocket gateway for real-time communication
 - Matchmaking queue management (via Redis)
-- Route players to appropriate worker threads
+- Route players to appropriate goroutines
 - JWT authentication and session management
 
 **Key Endpoints**:
@@ -162,86 +162,91 @@ Server → Client:
 
 ---
 
-### 3. Game Server (Worker Threads)
+### 3. Game Server (Goroutines)
 
-**Technology**: Node.js Worker Threads
+**Technology**: Go goroutines with channels
 
 **Responsibilities**:
 - Run game loop at 30 TPS (33.33ms intervals)
 - Physics simulation and collision detection
 - Server-side validation (anti-cheat)
-- Lag compensation (200ms state history)
+- Lag compensation (350ms state history)
 - Interest management (only send nearby entities)
 - Broadcast state updates to clients
 
 **Architecture**:
 ```
-Main Thread (API Server)
+Main Goroutine (API Server)
     │
-    ├─> Worker 1 (manages Lobbies 1-3)
-    ├─> Worker 2 (manages Lobbies 4-6)
-    └─> Worker N (manages Lobbies N-M)
+    ├─> Goroutine 1 (manages Lobbies 1-3)
+    ├─> Goroutine 2 (manages Lobbies 4-6)
+    └─> Goroutine N (manages Lobbies N-M)
 
-Each Worker:
+Each Goroutine:
     - Runs independent game loops
-    - No shared memory with other workers
-    - Communicates via message passing
-    - Can handle 3-5 lobbies per worker
+    - Lightweight (~2KB per goroutine)
+    - Communicates via channels
+    - Can handle 3-5 lobbies per goroutine
 ```
 
 **Game Loop (30 TPS)**:
-```javascript
-function gameLoop(lobby: Lobby) {
-  const startTime = Date.now();
+```go
+func gameLoop(lobby *Lobby) {
+  ticker := time.NewTicker(33 * time.Millisecond)
+  defer ticker.Stop()
   
-  // 1. Process player inputs (with lag compensation)
-  processInputs(lobby);
-  
-  // 2. Update physics (movement, projectiles)
-  updatePhysics(lobby);
-  
-  // 3. Collision detection
-  checkCollisions(lobby);
-  
-  // 4. Update game state (safe zone, loot spawns)
-  updateGameState(lobby);
-  
-  // 5. Save state to history buffer (for lag compensation)
-  saveStateSnapshot(lobby);
-  
-  // 6. Broadcast updates to clients (with interest management)
-  broadcastUpdates(lobby);
-  
-  // 7. Log events to Cassandra (async, non-blocking)
-  logGameEvents(lobby);
-  
-  // Ensure 33.33ms tick rate
-  const elapsed = Date.now() - startTime;
-  const delay = Math.max(0, TICK_INTERVAL - elapsed);
-  setTimeout(() => gameLoop(lobby), delay);
+  for range ticker.C {
+    startTime := time.Now()
+    
+    // 1. Process player inputs (with lag compensation)
+    g.processInputs()
+    
+    // 2. Update physics (movement, projectiles)
+    g.updatePhysics()
+    
+    // 3. Collision detection
+    g.checkCollisions()
+    
+    // 4. Update game state (safe zone, loot spawns)
+    g.updateGameState()
+    
+    // 5. Save state to history buffer (for lag compensation)
+    g.saveStateSnapshot()
+    
+    // 6. Broadcast updates to clients (with interest management)
+    g.broadcastState()
+    
+    // 7. Log events to Cassandra (async, non-blocking)
+    g.logGameEvents()
+    
+    elapsed := time.Since(startTime)
+    if elapsed > 33*time.Millisecond {
+      log.Warn("Tick took too long: %v", elapsed)
+    }
+  }
 }
 ```
 
 **Lag Compensation**:
-```javascript
+```go
 // When player shoots:
-1. Client timestamp: T_client = 1000ms
-2. Server receives at: T_server = 1050ms (50ms lag)
-3. Server rewinds state to T_client (50ms ago)
-4. Check if hit would have occurred at that time
-5. If hit, apply damage in current state
+// 1. Client timestamp: T_client = 1000ms
+// 2. Server receives at: T_server = 1050ms (50ms lag)
+// 3. Server rewinds state to T_client (50ms ago)
+// 4. Check if hit would have occurred at that time
+// 5. If hit, apply damage in current state
 ```
 
 **Interest Management**:
-```javascript
+```go
 // Only send entities within 800 units of player
-function getInterestArea(player: Player): GameStateMessage {
-  return {
-    nearbyPlayers: players.filter(p => distance(p, player) < 800),
-    projectiles: projectiles.filter(b => distance(b, player) < 800),
-    nearbyLoot: loot.filter(l => distance(l, player) < 800),
-    safeZone: safeZone, // Always send
-  };
+func getInterestArea(player *Player) GameStateMessage {
+  return GameStateMessage{
+    NearbyPlayers: filterByDistance(players, player, 800),
+    Projectiles: filterByDistance(projectiles, player, 800),
+    NearbyLoot: filterByDistance(loot, player, 800),
+    SafeZone: safeZone, // Always send
+  }
 }
 ```
 
@@ -321,18 +326,21 @@ GROUP BY attacker_id;
 4. **Strings**: JWT sessions, rate limiting
 
 **Usage**:
-```javascript
+```go
 // Leaderboard
-await redis.zadd('leaderboard:wins', user.totalWins, user.userId);
-const topPlayers = await redis.zrevrange('leaderboard:wins', 0, 99);
+redis.ZAdd(ctx, "leaderboard:wins", &redis.Z{
+  Score: float64(user.TotalWins),
+  Member: user.UserID,
+})
+topPlayers := redis.ZRevRange(ctx, "leaderboard:wins", 0, 99)
 
 // Matchmaking queue
-await redis.lpush('queue:mmr:1000-1200', JSON.stringify(player));
-const players = await redis.lrange('queue:mmr:1000-1200', 0, 15);
+redis.LPush(ctx, "queue:mmr:1000-1200", playerJSON)
+players := redis.LRange(ctx, "queue:mmr:1000-1200", 0, 15)
 
 // Active lobby
-await redis.hset(`lobby:${lobbyId}`, 'status', 'playing');
-await redis.hset(`lobby:${lobbyId}`, 'player_count', 16);
+redis.HSet(ctx, fmt.Sprintf("lobby:%s", lobbyID), "status", "playing")
+redis.HSet(ctx, fmt.Sprintf("lobby:%s", lobbyID), "player_count", 16)
 ```
 
 ---
@@ -349,12 +357,12 @@ await redis.hset(`lobby:${lobbyId}`, 'player_count', 16);
 5. API Server → Redis: SET player:queue:<userId> "queue:mmr:1000-1200"
 6. API Server: Return 200 OK
 
-Background Matchmaker (runs every 2 seconds):
+Background Matchmaker (runs every 2 seconds in goroutine):
 7. Matchmaker → Redis: LLEN queue:mmr:1000-1200  # Check count
 8. If >= 16 players:
    - Redis: RPOP 16 players from queue
    - Create Lobby object
-   - Assign to Worker Thread
+   - Assign to Goroutine
    - Redis: HSET lobby:<id> ...
    - Notify players via WebSocket: "match_found"
 ```
@@ -370,7 +378,7 @@ Background Matchmaker (runs every 2 seconds):
      velocity: {x: 3, y: 2},
      rotation: 1.5
    }
-4. Server (Worker Thread): Receives input in game loop
+4. Server (Goroutine): Receives input in game loop
 5. Server: Validate speed (anti-cheat)
 6. Server: Check collision with walls
 7. Server: Update player position
@@ -418,7 +426,7 @@ Background Matchmaker (runs every 2 seconds):
    - Bulk insert game events
    - Insert combat logs
 8. Server: Close WebSocket connections
-9. Worker Thread: Destroy lobby object
+9. Goroutine: Destroy lobby object
 ```
 
 ---
@@ -429,8 +437,8 @@ Background Matchmaker (runs every 2 seconds):
 ```
 AWS EC2 c5.2xlarge (8 vCPUs, 16 GB RAM)
 ├─ API Server (2 vCPUs)
-├─ Worker Threads (6 vCPUs, ~20-30 lobbies)
-└─ Can handle: ~400-500 concurrent players
+├─ Goroutines (6 vCPUs, ~100-200 lobbies)
+└─ Can handle: ~1,500-3,000 concurrent players
 ```
 
 ### Horizontal Scaling (Multiple Servers)
@@ -461,55 +469,60 @@ Solution: Store lobby-to-server mapping in Redis
 ### Server-Side Validation
 
 **Movement Validation**:
-```javascript
-const distance = Math.sqrt(dx*dx + dy*dy);
-const maxDistance = PLAYER_BASE_SPEED * deltaTime;
-if (distance > maxDistance * 1.1) { // 10% tolerance
+```go
+distance := math.Sqrt(dx*dx + dy*dy)
+maxDistance := PLAYER_BASE_SPEED * deltaTime
+if distance > maxDistance * 1.1 { // 10% tolerance
   // REJECT: Speed hack attempt
-  logger.warn(`Speed hack detected: ${player.username}`);
-  return;
+  log.Warn("Speed hack detected: %s", player.Username)
+  return
 }
 ```
 
 **Fire Rate Validation**:
-```javascript
-const timeSinceLastShot = now - player.lastShotTime;
-if (timeSinceLastShot < WEAPON_FIRE_RATE * 0.9) {
+```go
+timeSinceLastShot := now.Sub(player.LastShotTime)
+if timeSinceLastShot < time.Duration(WEAPON_FIRE_RATE * 0.9) {
   // REJECT: Rapid fire hack
-  return;
+  return
 }
 ```
 
 **Collision Validation**:
-```javascript
-const pathBlocked = checkLineCollision(oldPos, newPos, obstacles);
-if (pathBlocked) {
+```go
+pathBlocked := checkLineCollision(oldPos, newPos, obstacles)
+if pathBlocked {
   // REJECT: Wall hack attempt
-  player.position = oldPos; // Reset
-  return;
+  player.Position = oldPos // Reset
+  return
 }
 ```
 
 ### JWT Authentication
-```javascript
+```go
 // Login: Generate token
-const token = jwt.sign(
-  { userId, username },
-  process.env.JWT_SECRET,
-  { expiresIn: '7d' }
-);
+token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+  "userId": userId,
+  "username": username,
+  "exp": time.Now().Add(7 * 24 * time.Hour).Unix(),
+})
+tokenString, _ := token.SignedString([]byte(os.Getenv("JWT_SECRET")))
 
 // Each request: Verify token
-const decoded = jwt.verify(token, process.env.JWT_SECRET);
+token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+  return []byte(os.Getenv("JWT_SECRET")), nil
+})
 ```
 
 ### Rate Limiting
-```javascript
+```go
 // Redis-based rate limiting
-const key = `ratelimit:${userId}:shoot`;
-const count = await redis.incr(key);
-if (count === 1) await redis.expire(key, 1); // 1 second window
-if (count > MAX_SHOTS_PER_SECOND) {
+key := fmt.Sprintf("ratelimit:%s:shoot", userId)
+count, _ := redis.Incr(ctx, key).Result()
+if count == 1 {
+  redis.Expire(ctx, key, 1*time.Second) // 1 second window
+}
+if count > MAX_SHOTS_PER_SECOND {
   // REJECT: Rate limit exceeded
 }
 ```
@@ -573,14 +586,14 @@ Additional:
 ## Development Workflow
 
 1. **Local Development**:
-   - Docker Compose for databases
+   - Docker/Podman Compose for databases
    - Run all services locally
-   - Hot reload with nodemon
+   - Hot reload with Air (Go)
 
 2. **Testing**:
-   - Unit tests (Jest)
-   - Integration tests (Supertest)
-   - Load testing (Artillery)
+   - Unit tests (Go testing package)
+   - Integration tests (testify)
+   - Load testing (Artillery + custom scripts)
 
 3. **CI/CD**:
    - GitHub Actions
