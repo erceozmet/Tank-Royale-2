@@ -33,7 +33,9 @@ function generateLeaderboardItems(): string {
     .join('');
 }
 
-export function createAuthScreen(onPlay: (playerName: string) => void): HTMLElement {
+type AuthCallback = (name: string, type: 'quick' | 'login' | 'register', data?: any) => void | Promise<void>;
+
+export function createAuthScreen(onPlay: AuthCallback): HTMLElement {
   const container = document.createElement('div');
   container.className = 'fixed inset-0 flex items-center justify-center p-8';
   
@@ -53,21 +55,27 @@ export function createAuthScreen(onPlay: (playerName: string) => void): HTMLElem
         <!-- Tab Switcher -->
         <div class="flex gap-2 p-1 bg-gray-100 rounded-lg w-full">
           <button
-            id="login-tab"
+            id="quick-play-tab"
             class="flex-1 px-4 py-2 rounded-md font-semibold transition-all bg-blue-500 text-white"
           >
             Quick Play
           </button>
           <button
+            id="signin-tab"
+            class="flex-1 px-4 py-2 rounded-md font-semibold transition-all bg-white/50 text-gray-600"
+          >
+            Sign In
+          </button>
+          <button
             id="register-tab"
             class="flex-1 px-4 py-2 rounded-md font-semibold transition-all bg-white/50 text-gray-600"
           >
-            Create Account
+            Register
           </button>
         </div>
 
         <!-- Quick Play Form -->
-        <div id="login-form" class="card-elegant w-full">
+        <div id="quick-play-form" class="card-elegant w-full">
           <div class="text-center mb-4">
             <h2 class="text-2xl font-bold text-gray-900">Jump In</h2>
             <p class="text-sm text-gray-500 mt-1">No account needed • Play instantly</p>
@@ -94,6 +102,50 @@ export function createAuthScreen(onPlay: (playerName: string) => void): HTMLElem
               disabled
             >
               PLAY NOW
+            </button>
+          </div>
+        </div>
+
+        <!-- Sign In Form (Hidden by default) -->
+        <div id="signin-form" class="card-elegant w-full hidden">
+          <div class="text-center mb-4">
+            <h2 class="text-2xl font-bold text-gray-900">Welcome Back</h2>
+            <p class="text-sm text-gray-500 mt-1">Sign in to continue your journey</p>
+          </div>
+          
+          <div class="space-y-4">
+            <div>
+              <label for="signin-username" class="block text-sm font-semibold text-gray-700 mb-2">
+                Username or Email
+              </label>
+              <input
+                type="text"
+                id="signin-username"
+                class="input-elegant"
+                placeholder="Enter your username or email"
+                autocomplete="username"
+              />
+            </div>
+            
+            <div>
+              <label for="signin-password" class="block text-sm font-semibold text-gray-700 mb-2">
+                Password
+              </label>
+              <input
+                type="password"
+                id="signin-password"
+                class="input-elegant"
+                placeholder="Enter your password"
+                autocomplete="current-password"
+              />
+            </div>
+            
+            <button
+              id="signin-button"
+              class="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled
+            >
+              SIGN IN
             </button>
           </div>
         </div>
@@ -244,37 +296,49 @@ export function createAuthScreen(onPlay: (playerName: string) => void): HTMLElem
   `;
 
   // Get elements
-  const loginTab = container.querySelector('#login-tab') as HTMLButtonElement;
+  const quickPlayTab = container.querySelector('#quick-play-tab') as HTMLButtonElement;
+  const signinTab = container.querySelector('#signin-tab') as HTMLButtonElement;
   const registerTab = container.querySelector('#register-tab') as HTMLButtonElement;
-  const loginForm = container.querySelector('#login-form') as HTMLDivElement;
+  
+  const quickPlayForm = container.querySelector('#quick-play-form') as HTMLDivElement;
+  const signinForm = container.querySelector('#signin-form') as HTMLDivElement;
   const registerForm = container.querySelector('#register-form') as HTMLDivElement;
   
   const quickPlayInput = container.querySelector('#quick-play-name') as HTMLInputElement;
   const quickPlayButton = container.querySelector('#quick-play-button') as HTMLButtonElement;
+  
+  const signinUsername = container.querySelector('#signin-username') as HTMLInputElement;
+  const signinPassword = container.querySelector('#signin-password') as HTMLInputElement;
+  const signinButton = container.querySelector('#signin-button') as HTMLButtonElement;
   
   const registerUsername = container.querySelector('#register-username') as HTMLInputElement;
   const registerEmail = container.querySelector('#register-email') as HTMLInputElement;
   const registerPassword = container.querySelector('#register-password') as HTMLInputElement;
   const registerButton = container.querySelector('#register-button') as HTMLButtonElement;
 
-  // Tab switching
-  loginTab.addEventListener('click', () => {
-    loginTab.classList.add('bg-blue-500', 'text-white');
-    loginTab.classList.remove('bg-white/50', 'text-gray-600');
-    registerTab.classList.remove('bg-blue-500', 'text-white');
-    registerTab.classList.add('bg-white/50', 'text-gray-600');
-    loginForm.classList.remove('hidden');
-    registerForm.classList.add('hidden');
-  });
+  // Tab switching helper
+  function switchTab(activeTab: HTMLButtonElement, activeForm: HTMLDivElement) {
+    // Reset all tabs
+    [quickPlayTab, signinTab, registerTab].forEach(tab => {
+      tab.classList.remove('bg-blue-500', 'text-white');
+      tab.classList.add('bg-white/50', 'text-gray-600');
+    });
+    
+    // Reset all forms
+    [quickPlayForm, signinForm, registerForm].forEach(form => {
+      form.classList.add('hidden');
+    });
+    
+    // Activate selected tab and form
+    activeTab.classList.add('bg-blue-500', 'text-white');
+    activeTab.classList.remove('bg-white/50', 'text-gray-600');
+    activeForm.classList.remove('hidden');
+  }
 
-  registerTab.addEventListener('click', () => {
-    registerTab.classList.add('bg-blue-500', 'text-white');
-    registerTab.classList.remove('bg-white/50', 'text-gray-600');
-    loginTab.classList.remove('bg-blue-500', 'text-white');
-    loginTab.classList.add('bg-white/50', 'text-gray-600');
-    registerForm.classList.remove('hidden');
-    loginForm.classList.add('hidden');
-  });
+  // Tab click handlers
+  quickPlayTab.addEventListener('click', () => switchTab(quickPlayTab, quickPlayForm));
+  signinTab.addEventListener('click', () => switchTab(signinTab, signinForm));
+  registerTab.addEventListener('click', () => switchTab(registerTab, registerForm));
 
   // Quick Play validation
   quickPlayInput.addEventListener('input', () => {
@@ -309,13 +373,40 @@ export function createAuthScreen(onPlay: (playerName: string) => void): HTMLElem
     }
   }
 
+  // Sign in form validation
+  function validateSignInForm() {
+    const username = signinUsername.value.trim();
+    const password = signinPassword.value.trim();
+    const isValid = username.length >= 3 && password.length >= 6;
+    
+    signinButton.disabled = !isValid;
+    
+    if (isValid) {
+      signinButton.classList.remove('opacity-50', 'cursor-not-allowed');
+      signinButton.classList.add('pulse-glow');
+    } else {
+      signinButton.classList.add('opacity-50', 'cursor-not-allowed');
+      signinButton.classList.remove('pulse-glow');
+    }
+  }
+
   registerUsername.addEventListener('input', validateRegisterForm);
   registerPassword.addEventListener('input', validateRegisterForm);
+  
+  signinUsername.addEventListener('input', validateSignInForm);
+  signinPassword.addEventListener('input', validateSignInForm);
 
   // Quick Play - Enter key
   quickPlayInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter' && !quickPlayButton.disabled) {
       handleQuickPlay();
+    }
+  });
+
+  // Sign In - Enter key
+  signinPassword.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' && !signinButton.disabled) {
+      handleSignIn();
     }
   });
 
@@ -326,7 +417,24 @@ export function createAuthScreen(onPlay: (playerName: string) => void): HTMLElem
     const name = quickPlayInput.value.trim();
     if (name.length >= 3 && name.length <= 15) {
       localStorage.setItem('blast-io-player-name', name);
-      onPlay(name);
+      onPlay(name, 'quick');
+    }
+  }
+
+  // Sign In button
+  signinButton.addEventListener('click', handleSignIn);
+
+  function handleSignIn() {
+    const usernameOrEmail = signinUsername.value.trim();
+    const password = signinPassword.value.trim();
+    
+    if (usernameOrEmail.length >= 3 && password.length >= 6) {
+      localStorage.setItem('blast-io-player-name', usernameOrEmail);
+      
+      onPlay(usernameOrEmail, 'login', {
+        usernameOrEmail,
+        password
+      });
     }
   }
 
@@ -337,13 +445,14 @@ export function createAuthScreen(onPlay: (playerName: string) => void): HTMLElem
     const password = registerPassword.value.trim();
     
     if (username.length >= 3 && username.length <= 15 && password.length >= 6) {
-      // TODO: Send to API for registration
-      console.log('Register:', { username, email, password });
-      
-      // For now, just play with username
       localStorage.setItem('blast-io-player-name', username);
       localStorage.setItem('blast-io-registered', 'true');
-      onPlay(username);
+      
+      onPlay(username, 'register', {
+        username,
+        email: email || `${username}@blast.io`,
+        password
+      });
     }
   });
 

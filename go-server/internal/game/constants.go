@@ -118,13 +118,24 @@ const (
 
 // Network constants
 const (
-	InterestRadius        = 800.0                  // Radius for state updates
-	LagCompensationBuffer = 200 * time.Millisecond // Time to keep state history
-	MaxMessageSize        = 65536                  // Max WebSocket message size
-	WriteWait             = 10 * time.Second       // Time allowed to write message
-	PongWait              = 60 * time.Second       // Time allowed to read pong
-	PingPeriod            = (PongWait * 9) / 10    // Send pings to peer with this period
-	MaxMessageQueueSize   = 256                    // Max messages queued per connection
+	InterestRadius = 800.0 // Radius for state updates
+
+	// Lag compensation buffer duration
+	// This determines how far back in time we can rewind for hit detection
+	// Tradeoffs:
+	//   200ms: 6 snapshots,  ~96KB/match  - Good for regional servers (US, EU)
+	//   350ms: 11 snapshots, ~176KB/match - Accommodates most overseas players
+	//   500ms: 15 snapshots, ~240KB/match - Maximum international support
+	// Longer buffers allow fairer hit detection for high-ping players but increase
+	// "trade kill" scenarios where both players can kill each other due to latency.
+	// Memory impact is minimal; gameplay fairness is the main consideration.
+	LagCompensationBuffer = 350 * time.Millisecond // Recommended: 200-500ms
+
+	MaxMessageSize       = 65536             // Max WebSocket message size
+	WriteWait            = 10 * time.Second  // Time allowed to write message
+	PongWait             = 60 * time.Second  // Time allowed to read pong
+	PingPeriod           = (PongWait * 9) / 10 // Send pings to peer with this period
+	MaxMessageQueueSize  = 256              // Max messages queued per connection
 )
 
 // Calculate effective weapon stats with boosts

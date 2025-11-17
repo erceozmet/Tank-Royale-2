@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"time"
+
 	"github.com/erceozmet/tank-royale-2/go-server/internal/game/entities"
 	"github.com/erceozmet/tank-royale-2/go-server/internal/game/safezone"
 )
@@ -20,6 +22,7 @@ const (
 type GameState struct {
 	MatchID     string                          `json:"matchId"`
 	Tick        int64                           `json:"tick"`
+	Timestamp   time.Time                       `json:"timestamp"` // When this state was created
 	Phase       GamePhase                       `json:"phase"`
 	Players     map[string]*entities.Player     `json:"players"`     // userID -> Player
 	Projectiles map[string]*entities.Projectile `json:"projectiles"` // projectileID -> Projectile
@@ -47,6 +50,7 @@ func NewGameState(matchID string) *GameState {
 	return &GameState{
 		MatchID:     matchID,
 		Tick:        0,
+		Timestamp:   time.Now(),
 		Phase:       PhaseWaiting,
 		Players:     make(map[string]*entities.Player),
 		Projectiles: make(map[string]*entities.Projectile),

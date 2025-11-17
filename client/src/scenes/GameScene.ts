@@ -11,6 +11,7 @@ import {
   BULLET_RADIUS,
   FIRE_RATE,
 } from '../config/constants';
+import { getWebSocketService } from '../services/websocket';
 
 interface Player {
   graphics: Phaser.GameObjects.Graphics;
@@ -20,8 +21,19 @@ interface Player {
   isTurbo: boolean;
 }
 
+interface OtherPlayer {
+  id: string;
+  name: string;
+  graphics: Phaser.GameObjects.Graphics;
+  x: number;
+  y: number;
+  color: number;
+  health: number;
+}
+
 export default class GameScene extends Phaser.Scene {
   private player!: Player;
+  private otherPlayers: Map<string, OtherPlayer> = new Map();
   private wasd!: {
     w: Phaser.Input.Keyboard.Key;
     a: Phaser.Input.Keyboard.Key;
@@ -32,6 +44,8 @@ export default class GameScene extends Phaser.Scene {
   private lastFireTime: number = 0;
   private bullets: Phaser.GameObjects.Graphics[] = [];
   private gridGraphics!: Phaser.GameObjects.Graphics;
+  private lastPositionUpdate: number = 0;
+  private positionUpdateRate: number = 50; // Send position every 50ms
 
   constructor() {
     super({ key: 'GameScene' });
@@ -65,8 +79,52 @@ export default class GameScene extends Phaser.Scene {
       this.shootBullet(pointer);
     });
 
+    // WebSocket connection is established in app.ts before scene starts
+    // Setup message handlers
+    const ws = getWebSocketService();
+    if (ws.isConnected()) {
+      console.log('✅ WebSocket already connected');
+      this.setupWebSocketHandlers();
+    } else {
+      console.warn('⚠️ WebSocket not connected - running in offline mode');
+    }
+
     console.log('✅ GameScene: blast.io game ready');
     console.log(`📐 Map size: ${MAP_WIDTH}x${MAP_HEIGHT}`);
+  }
+
+  private setupWebSocketHandlers() {
+    const ws = getWebSocketService();
+    
+    // TODO: Implement multiplayer message handlers
+    // For now, just log that we're ready for multiplayer
+    console.log('🎮 Multiplayer handlers ready');
+    console.log(`👤 Playing as: ${ws.getUsername()} (${ws.getUserId()})`);
+    
+    // Handle other players joining
+    ws.on('player_joined', (data: any) => {
+      console.log('� Player joined:', data);
+    });
+
+    // Handle other players moving
+    ws.on('player_moved', (data: any) => {
+      console.log('🏃 Player moved:', data);
+    });
+
+    // Handle other players leaving
+    ws.on('player_left', (data: any) => {
+      console.log('� Player left:', data);
+    });
+  }
+
+  private handlePlayerDeath() {
+    console.log('💀 Player died');
+    const ws = getWebSocketService();
+    if (ws.isConnected()) {
+      ws.sendDeath();
+    }
+    // TODO: Show death screen and respawn options
+    this.scene.restart();
   }
 
   private createGrid() {
