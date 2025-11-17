@@ -9,8 +9,8 @@ export const GAME_CONFIG: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO, // WebGL with Canvas fallback
   width: 1280,
   height: 720,
-  parent: 'game-container',
-  backgroundColor: '#2d2d2d',
+  parent: 'phaser-game',
+  backgroundColor: '#ffffff', // White background
   
   physics: {
     default: 'arcade',
@@ -36,7 +36,7 @@ export const GAME_CONFIG: Phaser.Types.Core.GameConfig = {
   input: {
     keyboard: true,
     mouse: true,
-    touch: false, // Disable for desktop-only initially
+    touch: false, // Desktop-only
   },
   
   render: {
@@ -55,3 +55,6 @@ export const GAME_CONFIG: Phaser.Types.Core.GameConfig = {
     createContainer: true, // Allow DOM elements in scenes
   },
 };
+
+export default GAME_CONFIG;
+

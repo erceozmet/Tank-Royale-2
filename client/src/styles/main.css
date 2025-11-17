@@ -1,219 +1,217 @@
+@import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Orbitron:wght@600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 /* Base styles */
-@layer base {
-  * {
-    @apply antialiased;
-  }
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 
-  html, body {
-    @apply h-full w-full m-0 p-0 overflow-hidden;
-  }
+html, body {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
 
-  body {
-    @apply bg-white text-gray-900 font-sans;
-    /* White grid background pattern */
-    background-image: 
-      linear-gradient(to right, #e5e7eb 1px, transparent 1px),
-      linear-gradient(to bottom, #e5e7eb 1px, transparent 1px);
-    background-size: 40px 40px;
-  }
+body {
+  background-color: white;
+  color: rgb(17 24 39);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  /* White grid background pattern */
+  background-image: 
+    linear-gradient(to right, #e5e7eb 1px, transparent 1px),
+    linear-gradient(to bottom, #e5e7eb 1px, transparent 1px);
+  background-size: 40px 40px;
+}
 
-  #root {
-    @apply h-full w-full;
+#root {
+  height: 100%;
+  width: 100%;
+}
+
+/* Component styles using standard CSS */
+.card-elegant {
+  background-color: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgb(229 231 235);
+  border-radius: 0.75rem;
+  padding: 2rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.btn-primary {
+  background-color: rgb(59 130 246);
+  color: white;
+  font-weight: 700;
+  padding: 0.875rem 2rem;
+  border-radius: 0.75rem;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: rgb(37 99 235);
+  box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.4);
+  transform: translateY(-2px);
+}
+
+.btn-glass {
+  background-color: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(8px);
+  border: 2px solid rgb(229 231 235);
+  color: rgb(31 41 55);
+  font-weight: 600;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-glass:hover {
+  background-color: rgba(255, 255, 255, 0.95);
+  border-color: rgb(59 130 246);
+  color: rgb(59 130 246);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.input-elegant {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  border: 2px solid rgb(229 231 235);
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  transition: all 0.2s;
+  background-color: white;
+  color: rgb(17 24 39);
+}
+
+.input-elegant:focus {
+  outline: none;
+  border-color: rgb(59 130 246);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.hud-element {
+  border-radius: 9999px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 
-/* Custom components */
-@layer components {
-  /* Glass morphism button */
-  .btn-glass {
-    @apply bg-white/80 backdrop-blur-sm border border-gray-200 
-           hover:bg-white hover:shadow-lg hover:scale-105 
-           transition-all duration-200 ease-out;
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
   }
-
-  /* Primary action button */
-  .btn-primary {
-    @apply bg-blue-500 hover:bg-blue-600 text-white 
-           shadow-lg hover:shadow-xl hover:scale-105 
-           transition-all duration-200 ease-out;
-  }
-
-  /* Danger button */
-  .btn-danger {
-    @apply bg-red-500 hover:bg-red-600 text-white 
-           shadow-lg hover:shadow-xl hover:scale-105 
-           transition-all duration-200 ease-out;
-  }
-
-  /* Input field with elegant styling */
-  .input-elegant {
-    @apply bg-white/80 backdrop-blur-sm border-2 border-gray-200 
-           focus:border-blue-500 focus:ring-2 focus:ring-blue-200 
-           rounded-lg px-4 py-3 outline-none transition-all duration-200;
-  }
-
-  /* Card container */
-  .card-elegant {
-    @apply bg-white/90 backdrop-blur-md border border-gray-200 
-           rounded-2xl shadow-xl p-6;
-  }
-
-  /* HUD element styling */
-  .hud-element {
-    @apply bg-white/90 backdrop-blur-md border border-gray-300 
-           rounded-xl shadow-lg;
-  }
-
-  /* Player circle (will be used in canvas, but defining colors here) */
-  .player-circle {
-    @apply rounded-full shadow-lg;
-  }
-
-  /* Minimap styling */
-  .minimap {
-    @apply bg-white/90 backdrop-blur-md border-2 border-gray-300 
-           rounded-xl shadow-xl overflow-hidden;
-  }
-
-  /* Controls display */
-  .controls-display {
-    @apply bg-white/80 backdrop-blur-sm border border-gray-200 
-           rounded-lg p-4 text-sm font-mono;
-  }
-
-  /* Zone warning */
-  .zone-warning {
-    @apply bg-orange-500 text-white px-6 py-3 rounded-full 
-           shadow-lg animate-pulse-slow font-semibold;
-  }
-
-  /* Health bar */
-  .health-bar {
-    @apply bg-gray-200 rounded-full overflow-hidden h-4 relative;
-  }
-
-  .health-bar-fill {
-    @apply h-full transition-all duration-300 ease-out rounded-full;
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }
 
-/* Utility classes */
-@layer utilities {
-  /* Smooth fade in animation */
-  .fade-in {
-    animation: fadeIn 0.5s ease-in-out;
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
   }
-
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: translateY(10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  /* Slide in from left */
-  .slide-in-left {
-    animation: slideInLeft 0.4s ease-out;
-  }
-
-  @keyframes slideInLeft {
-    from {
-      opacity: 0;
-      transform: translateX(-20px);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(0);
-    }
-  }
-
-  /* Slide in from right */
-  .slide-in-right {
-    animation: slideInRight 0.4s ease-out;
-  }
-
-  @keyframes slideInRight {
-    from {
-      opacity: 0;
-      transform: translateX(20px);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(0);
-    }
-  }
-
-  /* Pulse glow effect */
-  .pulse-glow {
-    animation: pulseGlow 2s ease-in-out infinite;
-  }
-
-  @keyframes pulseGlow {
-    0%, 100% {
-      box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
-    }
-    50% {
-      box-shadow: 0 0 40px rgba(59, 130, 246, 0.6);
-    }
-  }
-
-  /* No select (for game UI) */
-  .no-select {
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-  }
-
-  /* Custom scrollbar */
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 8px;
-  }
-
-  .custom-scrollbar::-webkit-scrollbar-track {
-    @apply bg-gray-100 rounded-full;
-  }
-
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-gray-300 rounded-full hover:bg-gray-400;
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }
 
-/* Game-specific styles */
-.game-canvas {
-  @apply absolute inset-0 z-0;
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(59, 130, 246, 0.8);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.slide-in-left {
+  animation: slideInLeft 0.4s ease-out;
+}
+
+.slide-in-right {
+  animation: slideInRight 0.4s ease-out;
+}
+
+.pulse-glow {
+  animation: pulseGlow 2s ease-in-out infinite;
+}
+
+/* Minimap styles */
+.minimap {
+  background-color: rgb(249 250 251);
+  border-radius: 9999px;
+}
+
+.minimap-control {
+  background-color: rgb(243 244 246);
+  border-radius: 9999px;
+}
+
+.minimap-control:hover {
+  background-color: rgb(209 213 219);
+}
+
+/* Game overlay */
+.game-container {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
 }
 
 .game-ui-overlay {
-  @apply absolute inset-0 z-10 pointer-events-none;
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
 }
 
 .game-ui-overlay > * {
-  @apply pointer-events-auto;
+  pointer-events: auto;
 }
 
 /* Logo styling */
-.blast-logo {
+.font-display {
   font-family: 'Orbitron', sans-serif;
-  @apply text-5xl font-black tracking-tight;
-  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  text-shadow: 0 2px 20px rgba(59, 130, 246, 0.3);
+  font-size: 3rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
 }
 
 /* Loading spinner */
 .spinner {
-  @apply inline-block w-8 h-8 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin;
+  display: inline-block;
+  width: 2rem;
+  height: 2rem;
+  border: 4px solid rgb(229 231 235);
+  border-top-color: rgb(59 130 246);
+  border-radius: 9999px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
