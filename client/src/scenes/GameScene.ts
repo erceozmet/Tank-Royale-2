@@ -1,289 +1,494 @@
 import Phaser from 'phaser';
-import {
-  MAP_WIDTH,
-  MAP_HEIGHT,
-  COLORS,
-  PLAYER_RADIUS,
-  PLAYER_BASE_SPEED,
-  PLAYER_TURBO_SPEED,
-  PLAYER_COLORS,
-  BULLET_SPEED,
-  BULLET_RADIUS,
-  FIRE_RATE,
-} from '../config/constants';
-import { getWebSocketService } from '../services/websocket';
+import { MAP_WIDTH, MAP_HEIGHT, COLORS } from '../config/constants';
+import { getWebSocketService, GameState, PlayerState, Projectile, Loot, Crate } from '../services/websocket';
 
-interface Player {
-  graphics: Phaser.GameObjects.Graphics;
-  body: Phaser.Physics.Arcade.Body;
-  color: number;
-  health: number;
-  isTurbo: boolean;
-}
+// TODO: Replace with AI-generated tank sprite
+const TANK_SIZE = 30;
+// TODO: Replace with AI-generated bullet sprite
+const BULLET_SIZE = 6;
+// TODO: Replace with AI-generated crate sprite
+const CRATE_SIZE = 25;
+// TODO: Replace with AI-generated loot sprite
+const LOOT_SIZE = 15;
 
-interface OtherPlayer {
-  id: string;
-  name: string;
-  graphics: Phaser.GameObjects.Graphics;
-  x: number;
-  y: number;
-  color: number;
-  health: number;
+interface TankGraphics {
+  body: Phaser.GameObjects.Graphics;
+  healthBar: Phaser.GameObjects.Graphics;
+  nameText: Phaser.GameObjects.Text;
 }
 
 export default class GameScene extends Phaser.Scene {
-  private player!: Player;
-  private otherPlayers: Map<string, OtherPlayer> = new Map();
-  private wasd!: {
+  private localPlayerId: string | null = null;
+  private tanks: Map<string, TankGraphics> = new Map();
+  private projectileGraphics: Map<string, Phaser.GameObjects.Graphics> = new Map();
+  private lootGraphics: Map<string, Phaser.GameObjects.Graphics> = new Map();
+  private crateGraphics: Map<string, Phaser.GameObjects.Graphics> = new Map();
+  
+  private safeZoneGraphics!: Phaser.GameObjects.Graphics;
+  private gridGraphics!: Phaser.GameObjects.Graphics;
+  
+  private lastGameState: GameState | null = null;
+  private currentTick: number = 0;
+
+  // Input state
+  private keys: {
     w: Phaser.Input.Keyboard.Key;
     a: Phaser.Input.Keyboard.Key;
     s: Phaser.Input.Keyboard.Key;
     d: Phaser.Input.Keyboard.Key;
+  } | null = null;
+  private lastInputSent: { up: boolean; down: boolean; left: boolean; right: boolean; shoot: boolean } = {
+    up: false,
+    down: false,
+    left: false,
+    right: false,
+    shoot: false,
   };
-  private spaceKey!: Phaser.Input.Keyboard.Key;
-  private lastFireTime: number = 0;
-  private bullets: Phaser.GameObjects.Graphics[] = [];
-  private gridGraphics!: Phaser.GameObjects.Graphics;
-  private lastPositionUpdate: number = 0;
-  private positionUpdateRate: number = 50; // Send position every 50ms
 
   constructor() {
     super({ key: 'GameScene' });
   }
 
   create() {
-    console.log('�� GameScene: Creating blast.io game');
+    console.log('🎮 GameScene: Initializing');
 
-    // Set white background
+    // Set background
     this.cameras.main.setBackgroundColor(COLORS.BACKGROUND);
-
-    // Set up world bounds (4000x4000 map)
     this.physics.world.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
 
-    // Create grid background
+    // Create grid
     this.createGrid();
 
-    // Create player
-    this.createPlayer();
+    // Create safe zone graphics
+    this.safeZoneGraphics = this.add.graphics();
 
-    // Set up camera to follow player
-    this.cameras.main.startFollow(this.player.graphics, true, 0.1, 0.1);
-    this.cameras.main.setZoom(1);
+    // Set up camera
     this.cameras.main.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
+    this.cameras.main.setZoom(1);
 
-    // Set up controls
-    this.setupControls();
+    // Set up input
+    this.setupInput();
 
-    // Mouse click to shoot
-    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      this.shootBullet(pointer);
-    });
-
-    // WebSocket connection is established in app.ts before scene starts
-    // Setup message handlers
+    // Connect to WebSocket and setup handlers
     const ws = getWebSocketService();
-    if (ws.isConnected()) {
-      console.log('✅ WebSocket already connected');
-      this.setupWebSocketHandlers();
-    } else {
-      console.warn('⚠️ WebSocket not connected - running in offline mode');
+    this.localPlayerId = ws.getUserId();
+    
+    if (!ws.isConnected()) {
+      console.error('❌ WebSocket not connected, returning to menu');
+      this.scene.start('MenuScene');
+      return;
     }
 
-    console.log('✅ GameScene: blast.io game ready');
-    console.log(`📐 Map size: ${MAP_WIDTH}x${MAP_HEIGHT}`);
-  }
-
-  private setupWebSocketHandlers() {
-    const ws = getWebSocketService();
+    this.setupWebSocketHandlers();
     
-    // TODO: Implement multiplayer message handlers
-    // For now, just log that we're ready for multiplayer
-    console.log('🎮 Multiplayer handlers ready');
-    console.log(`👤 Playing as: ${ws.getUsername()} (${ws.getUserId()})`);
-    
-    // Handle other players joining
-    ws.on('player_joined', (data: any) => {
-      console.log('� Player joined:', data);
-    });
-
-    // Handle other players moving
-    ws.on('player_moved', (data: any) => {
-      console.log('🏃 Player moved:', data);
-    });
-
-    // Handle other players leaving
-    ws.on('player_left', (data: any) => {
-      console.log('� Player left:', data);
-    });
-  }
-
-  private handlePlayerDeath() {
-    console.log('💀 Player died');
-    const ws = getWebSocketService();
-    if (ws.isConnected()) {
-      ws.sendDeath();
-    }
-    // TODO: Show death screen and respawn options
-    this.scene.restart();
+    console.log('✅ GameScene ready, waiting for game state from server');
   }
 
   private createGrid() {
-    // Create grid graphics
     this.gridGraphics = this.add.graphics();
-    this.gridGraphics.lineStyle(1, COLORS.GRID, 1);
+    this.gridGraphics.lineStyle(1, COLORS.GRID, 0.5);
 
-    // Draw vertical lines
-    for (let x = 0; x <= MAP_WIDTH; x += 40) {
+    // Draw vertical lines every 100 pixels
+    for (let x = 0; x <= MAP_WIDTH; x += 100) {
       this.gridGraphics.lineBetween(x, 0, x, MAP_HEIGHT);
     }
 
-    // Draw horizontal lines
-    for (let y = 0; y <= MAP_HEIGHT; y += 40) {
+    // Draw horizontal lines every 100 pixels
+    for (let y = 0; y <= MAP_HEIGHT; y += 100) {
       this.gridGraphics.lineBetween(0, y, MAP_WIDTH, y);
     }
   }
 
-  private createPlayer() {
-    // Random color from PLAYER_COLORS
-    const colorHex = PLAYER_COLORS[Math.floor(Math.random() * PLAYER_COLORS.length)];
-    const color = parseInt(colorHex.replace('#', ''), 16);
+  private setupInput() {
+    if (!this.input.keyboard) return;
 
-    // Create graphics object for player circle
-    const graphics = this.add.graphics();
-    graphics.fillStyle(color, 1);
-    graphics.fillCircle(0, 0, PLAYER_RADIUS);
-
-    // Add black outline
-    graphics.lineStyle(2, 0x000000, 1);
-    graphics.strokeCircle(0, 0, PLAYER_RADIUS);
-
-    // Start in center of map
-    graphics.setPosition(MAP_WIDTH / 2, MAP_HEIGHT / 2);
-
-    // Add physics to graphics
-    this.physics.add.existing(graphics);
-    const body = graphics.body as Phaser.Physics.Arcade.Body;
-    body.setCircle(PLAYER_RADIUS);
-    body.setCollideWorldBounds(true);
-
-    this.player = {
-      graphics,
-      body,
-      color,
-      health: 100,
-      isTurbo: false,
-    };
-  }
-
-  private setupControls() {
-    // WASD controls
-    this.wasd = {
-      w: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.W),
-      a: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A),
-      s: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S),
-      d: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D),
+    this.keys = {
+      w: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
+      a: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
+      s: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
+      d: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
     };
 
-    // Space for turbo
-    this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-  }
-
-  private shootBullet(pointer: Phaser.Input.Pointer) {
-    const now = this.time.now;
-    if (now - this.lastFireTime < FIRE_RATE) {
-      return; // Rate limiting
-    }
-
-    this.lastFireTime = now;
-
-    // Get world position of pointer
-    const worldX = pointer.worldX;
-    const worldY = pointer.worldY;
-
-    // Calculate direction
-    const angle = Phaser.Math.Angle.Between(
-      this.player.graphics.x,
-      this.player.graphics.y,
-      worldX,
-      worldY
-    );
-
-    // Create bullet
-    const bullet = this.add.graphics();
-    bullet.fillStyle(0x000000, 1);
-    bullet.fillCircle(0, 0, BULLET_RADIUS);
-    bullet.setPosition(this.player.graphics.x, this.player.graphics.y);
-
-    // Add physics
-    this.physics.add.existing(bullet);
-    const bulletBody = bullet.body as Phaser.Physics.Arcade.Body;
-    bulletBody.setCircle(BULLET_RADIUS);
-
-    // Set velocity
-    bulletBody.setVelocity(Math.cos(angle) * BULLET_SPEED, Math.sin(angle) * BULLET_SPEED);
-
-    this.bullets.push(bullet);
-
-    // Destroy bullet after 2 seconds
-    this.time.delayedCall(2000, () => {
-      bullet.destroy();
-      const index = this.bullets.indexOf(bullet);
-      if (index > -1) {
-        this.bullets.splice(index, 1);
-      }
+    // Mouse click to shoot
+    this.input.on('pointerdown', () => {
+      this.sendInput(true);
     });
   }
 
-  update() {
-    // Handle movement
-    let velocityX = 0;
-    let velocityY = 0;
+  private setupWebSocketHandlers() {
+    const ws = getWebSocketService();
 
-    if (this.wasd.w.isDown) {
-      velocityY = -1;
-    } else if (this.wasd.s.isDown) {
-      velocityY = 1;
+    // Listen for game state updates (30 times per second from server)
+    ws.on('game_state', (state: GameState) => {
+      this.lastGameState = state;
+      this.currentTick = state.tick;
+      this.updateGameState(state);
+    });
+
+    // Handle match end
+    ws.on('match_ended', (data: any) => {
+      console.log('� Match ended:', data);
+      // TODO: Show game over screen
+      this.scene.start('GameOverScene', data);
+    });
+
+    // Handle player death
+    ws.on('player_died', (data: any) => {
+      console.log('💀 Player died:', data);
+    });
+
+    console.log('✅ WebSocket handlers registered');
+  }
+
+  private updateGameState(state: GameState) {
+    // Update players/tanks
+    this.updatePlayers(state.players);
+    
+    // Update projectiles
+    this.updateProjectiles(state.projectiles);
+    
+    // Update loot
+    this.updateLoot(state.loot);
+    
+    // Update crates
+    this.updateCrates(state.crates);
+    
+    // Update safe zone
+    if (state.safeZone) {
+      this.updateSafeZone(state.safeZone);
     }
 
-    if (this.wasd.a.isDown) {
-      velocityX = -1;
-    } else if (this.wasd.d.isDown) {
-      velocityX = 1;
+    // Follow local player with camera
+    if (this.localPlayerId && state.players[this.localPlayerId]) {
+      const localPlayer = state.players[this.localPlayerId];
+      this.cameras.main.scrollX = localPlayer.position.x - this.cameras.main.width / 2;
+      this.cameras.main.scrollY = localPlayer.position.y - this.cameras.main.height / 2;
     }
-
-    // Normalize diagonal movement
-    if (velocityX !== 0 && velocityY !== 0) {
-      velocityX *= 0.707;
-      velocityY *= 0.707;
-    }
-
-    // Check if turbo is active
-    this.player.isTurbo = this.spaceKey.isDown;
-    const speed = this.player.isTurbo ? PLAYER_TURBO_SPEED : PLAYER_BASE_SPEED;
-
-    // Apply velocity
-    this.player.body.setVelocity(velocityX * speed, velocityY * speed);
 
     // Update HUD
-    const playerName = localStorage.getItem('blast-io-player-name') || 'Player';
-    if (window.updateHUD) {
-      window.updateHUD({
-        playerName,
-        health: this.player.health,
-        maxHealth: 100,
-        playersAlive: 24,
+    this.updateHUD(state);
+  }
+
+  private updatePlayers(players: Record<string, PlayerState>) {
+    const playerIds = Object.keys(players);
+
+    // Remove tanks that no longer exist
+    this.tanks.forEach((graphics, id) => {
+      if (!players[id]) {
+        graphics.body.destroy();
+        graphics.healthBar.destroy();
+        graphics.nameText.destroy();
+        this.tanks.delete(id);
+      }
+    });
+
+    // Update or create tanks
+    playerIds.forEach(id => {
+      const player = players[id];
+      if (!player.isAlive) return;
+
+      let tank = this.tanks.get(id);
+      if (!tank) {
+        tank = this.createTank(id, player);
+        this.tanks.set(id, tank);
+      }
+
+      // Update position and rotation - TODO: Replace with proper sprite rotation
+      tank.body.setPosition(player.position.x, player.position.y);
+      tank.body.clear();
+      
+      // Draw tank facing the rotation angle
+      // TODO: Replace with AI-generated tank sprite
+      const isLocal = id === this.localPlayerId;
+      const color = isLocal ? 0x00ff00 : 0xff0000;
+      
+      // Draw tank body (rotated rectangle)
+      const cos = Math.cos(player.rotation);
+      const sin = Math.sin(player.rotation);
+      const halfSize = TANK_SIZE / 2;
+      
+      tank.body.fillStyle(color, 1);
+      tank.body.fillRect(player.position.x - halfSize, player.position.y - halfSize, TANK_SIZE, TANK_SIZE);
+      
+      // Draw gun barrel pointing in rotation direction
+      tank.body.fillStyle(0x000000, 1);
+      const barrelLength = TANK_SIZE / 2;
+      const barrelWidth = 10;
+      const barrelX = player.position.x + cos * barrelLength / 2;
+      const barrelY = player.position.y + sin * barrelLength / 2;
+      tank.body.fillRect(barrelX - barrelWidth / 2, barrelY - barrelWidth / 2, barrelWidth, barrelLength);
+
+      // Update health bar
+      this.updateHealthBar(tank.healthBar, player.health, player.maxHealth);
+    });
+  }
+
+  private createTank(_id: string, player: PlayerState): TankGraphics {
+    const body = this.add.graphics();
+    
+    const healthBar = this.add.graphics();
+    
+    const nameText = this.add.text(0, 0, player.username, {
+      fontSize: '12px',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 2,
+    });
+    nameText.setOrigin(0.5, 1);
+
+    return { body, healthBar, nameText };
+  }
+
+  private updateHealthBar(graphics: Phaser.GameObjects.Graphics, health: number, maxHealth: number) {
+    graphics.clear();
+    
+    const barWidth = TANK_SIZE;
+    const barHeight = 4;
+    const healthPercent = health / maxHealth;
+
+    // Background
+    graphics.fillStyle(0x000000, 0.5);
+    graphics.fillRect(-barWidth / 2, 0, barWidth, barHeight);
+
+    // Health
+    const healthColor = healthPercent > 0.5 ? 0x00ff00 : healthPercent > 0.25 ? 0xffff00 : 0xff0000;
+    graphics.fillStyle(healthColor, 1);
+    graphics.fillRect(-barWidth / 2, 0, barWidth * healthPercent, barHeight);
+  }
+
+  private updateProjectiles(projectiles: Projectile[]) {
+    const projectileIds = new Set(projectiles.map(p => p.id));
+
+    // Remove old projectiles
+    this.projectileGraphics.forEach((graphics, id) => {
+      if (!projectileIds.has(id)) {
+        graphics.destroy();
+        this.projectileGraphics.delete(id);
+      }
+    });
+
+    // Update or create projectiles
+    projectiles.forEach(proj => {
+      let graphics = this.projectileGraphics.get(proj.id);
+      if (!graphics) {
+        graphics = this.add.graphics();
+        // TODO: Replace with AI-generated bullet sprite
+        graphics.fillStyle(0x000000, 1);
+        graphics.fillCircle(0, 0, BULLET_SIZE);
+        this.projectileGraphics.set(proj.id, graphics);
+      }
+
+      graphics.setPosition(proj.position.x, proj.position.y);
+    });
+  }
+
+  private updateLoot(loot: Loot[]) {
+    const lootIds = new Set(loot.map(l => l.id));
+
+    // Remove old loot
+    this.lootGraphics.forEach((graphics, id) => {
+      if (!lootIds.has(id)) {
+        graphics.destroy();
+        this.lootGraphics.delete(id);
+      }
+    });
+
+    // Update or create loot
+    loot.forEach(item => {
+      let graphics = this.lootGraphics.get(item.id);
+      if (!graphics) {
+        graphics = this.add.graphics();
+        // TODO: Replace with AI-generated loot sprite (different colors for types)
+        const lootColor = this.getLootColor(item.type);
+        graphics.fillStyle(lootColor, 1);
+        // Draw a simple diamond shape
+        graphics.beginPath();
+        graphics.moveTo(0, -LOOT_SIZE);
+        graphics.lineTo(LOOT_SIZE, 0);
+        graphics.lineTo(0, LOOT_SIZE);
+        graphics.lineTo(-LOOT_SIZE, 0);
+        graphics.closePath();
+        graphics.fillPath();
+        this.lootGraphics.set(item.id, graphics);
+      }
+
+      graphics.setPosition(item.position.x, item.position.y);
+    });
+  }
+
+  private getLootColor(type: string): number {
+    switch (type) {
+      case 'health': return 0xff0000;
+      case 'armor': return 0x0000ff;
+      case 'damage': return 0xff8800;
+      case 'speed': return 0x00ffff;
+      case 'fire_rate': return 0xff00ff;
+      default: return 0xffffff;
+    }
+  }
+
+  private updateCrates(crates: Crate[]) {
+    const crateIds = new Set(crates.map(c => c.id));
+
+    // Remove old crates
+    this.crateGraphics.forEach((graphics, id) => {
+      if (!crateIds.has(id)) {
+        graphics.destroy();
+        this.crateGraphics.delete(id);
+      }
+    });
+
+    // Update or create crates
+    crates.forEach(crate => {
+      if (crate.isOpened) {
+        // Remove opened crates
+        const graphics = this.crateGraphics.get(crate.id);
+        if (graphics) {
+          graphics.destroy();
+          this.crateGraphics.delete(crate.id);
+        }
+        return;
+      }
+
+      let graphics = this.crateGraphics.get(crate.id);
+      if (!graphics) {
+        graphics = this.add.graphics();
+        // TODO: Replace with AI-generated crate sprite
+        graphics.fillStyle(0x8b4513, 1);
+        graphics.fillRect(-CRATE_SIZE / 2, -CRATE_SIZE / 2, CRATE_SIZE, CRATE_SIZE);
+        graphics.lineStyle(2, 0x000000, 1);
+        graphics.strokeRect(-CRATE_SIZE / 2, -CRATE_SIZE / 2, CRATE_SIZE, CRATE_SIZE);
+        this.crateGraphics.set(crate.id, graphics);
+      }
+
+      graphics.setPosition(crate.position.x, crate.position.y);
+    });
+  }
+
+  private updateSafeZone(safeZone: any) {
+    this.safeZoneGraphics.clear();
+
+    // Draw danger zone (red tint outside safe zone)
+    this.safeZoneGraphics.fillStyle(0xff0000, 0.1);
+    this.safeZoneGraphics.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
+
+    // Clear safe zone (make it transparent)
+    this.safeZoneGraphics.fillStyle(0xffffff, 0);
+    this.safeZoneGraphics.fillCircle(
+      safeZone.center.x,
+      safeZone.center.y,
+      safeZone.currentRadius
+    );
+
+    // Draw safe zone border
+    this.safeZoneGraphics.lineStyle(3, 0x00ff00, 1);
+    this.safeZoneGraphics.strokeCircle(
+      safeZone.center.x,
+      safeZone.center.y,
+      safeZone.currentRadius
+    );
+
+    // Draw next safe zone if shrinking
+    if (safeZone.targetRadius < safeZone.currentRadius) {
+      this.safeZoneGraphics.lineStyle(2, 0xffff00, 0.5);
+      this.safeZoneGraphics.strokeCircle(
+        safeZone.center.x,
+        safeZone.center.y,
+        safeZone.targetRadius
+      );
+    }
+  }
+
+  private updateHUD(state: GameState) {
+    if (!this.localPlayerId) return;
+    
+    const localPlayer = state.players[this.localPlayerId];
+    if (!localPlayer) return;
+
+    const playersAlive = Object.values(state.players).filter(p => p.isAlive).length;
+
+    if ((window as any).updateHUD) {
+      (window as any).updateHUD({
+        playerName: localPlayer.username,
+        health: localPlayer.health,
+        maxHealth: localPlayer.maxHealth,
+        playersAlive,
       });
     }
 
-    // Update minimap
-    if (window.updateMinimap) {
-      window.updateMinimap({
-        playerX: this.player.graphics.x,
-        playerY: this.player.graphics.y,
+    if ((window as any).updateMinimap) {
+      (window as any).updateMinimap({
+        playerX: localPlayer.position.x,
+        playerY: localPlayer.position.y,
         mapWidth: MAP_WIDTH,
         mapHeight: MAP_HEIGHT,
-        safeZoneRadius: MAP_WIDTH / 2,
+        safeZoneRadius: state.safeZone?.currentRadius || MAP_WIDTH / 2,
       });
     }
+  }
+
+  update() {
+    if (!this.keys) return;
+
+    // Check input state
+    const up = this.keys.w.isDown;
+    const down = this.keys.s.isDown;
+    const left = this.keys.a.isDown;
+    const right = this.keys.d.isDown;
+
+    // Only send input if it changed
+    const inputChanged = 
+      up !== this.lastInputSent.up ||
+      down !== this.lastInputSent.down ||
+      left !== this.lastInputSent.left ||
+      right !== this.lastInputSent.right;
+
+    if (inputChanged) {
+      this.sendInput(false);
+    }
+  }
+
+  private sendInput(shoot: boolean) {
+    if (!this.keys) return;
+
+    const up = this.keys.w.isDown;
+    const down = this.keys.s.isDown;
+    const left = this.keys.a.isDown;
+    const right = this.keys.d.isDown;
+
+    this.lastInputSent = { up, down, left, right, shoot };
+
+    const ws = getWebSocketService();
+    const pointer = this.input.activePointer;
+    const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+
+    // Calculate aim angle
+    let aimAngle = 0;
+    if (this.localPlayerId && this.lastGameState) {
+      const localPlayer = this.lastGameState.players[this.localPlayerId];
+      if (localPlayer) {
+        aimAngle = Phaser.Math.Angle.Between(
+          localPlayer.position.x,
+          localPlayer.position.y,
+          worldPoint.x,
+          worldPoint.y
+        );
+      }
+    }
+
+    ws.send('player_input', {
+      tick: this.currentTick,
+      up,
+      down,
+      left,
+      right,
+      shoot,
+      aimAngle,
+    });
+  }
+
+  shutdown() {
+    // Clean up - WebSocket handlers will be cleaned up automatically
+    console.log('🧹 GameScene shutdown');
   }
 }

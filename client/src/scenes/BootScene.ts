@@ -20,8 +20,8 @@ export default class BootScene extends Phaser.Scene {
   create() {
     console.log('✅ BootScene: blast.io initialized');
     
-    // Start game scene directly
-    this.scene.start('GameScene');
+    // Skip MenuScene - go directly to matchmaking since auth is handled by React
+    this.scene.start('MatchmakingScene');
   }
 
   private createLoadingBar() {

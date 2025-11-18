@@ -8,24 +8,64 @@ interface WebSocketMessage {
   payload: any;
 }
 
-interface PlayerState {
+export interface PlayerState {
   userId: string;
   username: string;
-  x: number;
-  y: number;
-  velocityX: number;
-  velocityY: number;
+  position: { x: number; y: number };
+  velocity: { x: number; y: number };
+  rotation: number;
   health: number;
-  color: string;
-  isTurbo: boolean;
+  maxHealth: number;
+  speed: number;
+  armor: number;
+  damage: number;
+  fireRate: number;
+  isAlive: boolean;
+  kills: number;
+  deaths: number;
+  lastDamageTime?: number;
+  respawnTime?: number;
 }
 
-interface GameState {
+export interface Projectile {
+  id: string;
+  ownerId: string;
+  position: { x: number; y: number };
+  velocity: { x: number; y: number };
+  damage: number;
+  createdAt: number;
+}
+
+export interface Loot {
+  id: string;
+  type: string;
+  position: { x: number; y: number };
+  value: number;
+}
+
+export interface Crate {
+  id: string;
+  position: { x: number; y: number };
+  isOpened: boolean;
+}
+
+export interface SafeZone {
+  center: { x: number; y: number };
+  currentRadius: number;
+  targetRadius: number;
+  nextShrinkTime: number;
+  damagePerTick: number;
+}
+
+export interface GameState {
+  tick: number;
   players: Record<string, PlayerState>;
-  safeZoneRadius: number;
-  safeZoneCenterX: number;
-  safeZoneCenterY: number;
-  timestamp: number;
+  projectiles: Projectile[];
+  loot: Loot[];
+  crates: Crate[];
+  safeZone: SafeZone;
+  phase: string;
+  rankings: Array<{ userId: string; username: string; kills: number; placement: number }>;
 }
 
 type MessageHandler = (payload: any) => void;

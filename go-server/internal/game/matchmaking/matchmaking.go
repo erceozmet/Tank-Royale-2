@@ -115,9 +115,6 @@ func (s *MatchmakingService) JoinQueue(ctx context.Context, userID string) error
 		return fmt.Errorf("failed to add to queue: %w", err)
 	}
 
-	// Set expiration
-	s.redisDB.Client.Expire(ctx, queueKey, QueueTimeout)
-
 	fmt.Printf("Player %s joined matchmaking queue (MMR: %d)\n", user.Username, user.MMR)
 
 	return nil
@@ -183,6 +180,8 @@ func (s *MatchmakingService) tryCreateMatch() error {
 	if err != nil {
 		return fmt.Errorf("failed to get queue entries: %w", err)
 	}
+
+	fmt.Printf("[Matchmaking Ticker] Checking queue: %d players (need %d)\n", len(entries), game.MinPlayers)
 
 	if len(entries) < game.MinPlayers {
 		return nil // Not enough players
@@ -295,6 +294,21 @@ func (s *MatchmakingService) createMatch(ctx context.Context, players []QueueEnt
 
 	fmt.Printf("Created match %s with %d players\n", matchID, len(players))
 
+	// Store match assignments in Redis for each player (with 5 minute TTL)
+	for _, player := range players {
+		matchData := map[string]interface{}{
+			"matchId":     matchID,
+			"playerCount": len(players),
+			"createdAt":   time.Now().Unix(),
+		}
+		matchJSON, err := json.Marshal(matchData)
+		if err == nil {
+			key := fmt.Sprintf("match:player:%s", player.UserID)
+			s.redisDB.Client.Set(ctx, key, matchJSON, 5*time.Minute)
+			fmt.Printf("Stored match assignment for player %s in Redis\n", player.Username)
+		}
+	}
+
 	// Clean up finished matches in the background
 	go s.cleanupMatch(matchID)
 
@@ -343,6 +357,21 @@ func (s *MatchmakingService) GetActiveMatchCount() int {
 	s.matchesMu.RLock()
 	defer s.matchesMu.RUnlock()
 	return len(s.activeMatches)
+}
+
+// GetMatchAssignment retrieves a player's match assignment from Redis
+func (s *MatchmakingService) GetMatchAssignment(ctx context.Context, matchKey string) (map[string]interface{}, error) {
+	val, err := s.redisDB.Client.Get(ctx, matchKey).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	var matchData map[string]interface{}
+	if err := json.Unmarshal([]byte(val), &matchData); err != nil {
+		return nil, err
+	}
+
+	return matchData, nil
 }
 
 // GetQueueSize returns the number of players in queue

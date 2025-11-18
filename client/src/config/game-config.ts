@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import BootScene from '@scenes/BootScene';
 import MenuScene from '@scenes/MenuScene';
+import MatchmakingScene from '@scenes/MatchmakingScene';
 import LobbyScene from '@scenes/LobbyScene';
 import GameScene from '@scenes/GameScene';
 import GameOverScene from '@scenes/GameOverScene';
@@ -23,6 +24,7 @@ export const GAME_CONFIG: Phaser.Types.Core.GameConfig = {
   scene: [
     BootScene,
     MenuScene,
+    MatchmakingScene,
     LobbyScene,
     GameScene,
     GameOverScene,

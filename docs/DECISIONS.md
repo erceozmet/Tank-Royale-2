@@ -107,7 +107,7 @@ This document summarizes all the key architectural decisions we made for Tank Ro
 - ✅ **Good for portfolio** (shows security awareness)
 
 **Validations**:
-```javascript
+```go
 ✓ Movement speed (max 5 units/tick)
 ✓ Fire rate (min 500ms between shots)
 ✓ Collision detection (server-side)
@@ -344,10 +344,13 @@ When discussing this project with recruiters:
 **To begin coding**:
 ```bash
 # Set up databases
-docker-compose up -d
+make start-dbs
 
-# Start development
-npm run dev
+# Start Go server
+make run
+
+# Start client
+cd client && npm run dev
 ```
 
 ---

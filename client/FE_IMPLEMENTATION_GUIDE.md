@@ -1013,6 +1013,164 @@ const spacing = {
 
 ---
 
+## 🎨 AI Asset Generation Requirements
+
+> **Note**: All game assets are currently using placeholder graphics (simple shapes). These placeholders are marked with `TODO:` comments in the code and must be replaced with proper AI-generated sprites.
+
+### Asset Specifications
+
+#### 1. Tank Sprite
+- **Dimensions**: 30x30 pixels minimum, scalable vector preferred
+- **Style**: Top-down view, military tank
+- **Colors**: 
+  - Local player: Green (#00ff00)
+  - Enemy players: Red (#ff0000)
+- **Components**:
+  - Tank body (square/rectangular base)
+  - Gun barrel (separate, rotatable, pointing forward)
+  - Treads visible on sides
+- **Variations**: Consider light/medium/heavy tank designs for future upgrades
+- **Export Format**: PNG with transparency, or sprite sheet
+- **Current Placeholder**: `client/src/scenes/GameScene.ts` lines 200-221
+
+#### 2. Bullet/Projectile Sprite
+- **Dimensions**: 6x6 pixels (small, fast-moving)
+- **Style**: Simple projectile or energy blast
+- **Color**: Black (#000000) or metallic gray
+- **Shape**: Circle or small rocket shape
+- **Trail Effect**: Optional particle trail (consider separate asset)
+- **Export Format**: PNG with transparency
+- **Current Placeholder**: `client/src/scenes/GameScene.ts` lines 267-276
+
+#### 3. Loot Item Sprites
+- **Dimensions**: 15x15 pixels (diamond shape preferred)
+- **Style**: Glowing pickups with distinct colors
+- **Types & Colors**:
+  - Health: Red (#ff0000)
+  - Armor: Blue (#0000ff)
+  - Damage: Orange (#ff8800)
+  - Speed: Cyan (#00ffff)
+  - Fire Rate: Magenta (#ff00ff)
+- **Animation**: Consider idle floating/rotating animation
+- **Export Format**: PNG with transparency or animated sprite sheet
+- **Current Placeholder**: `client/src/scenes/GameScene.ts` lines 293-318
+
+#### 4. Crate/Loot Box Sprite
+- **Dimensions**: 25x25 pixels
+- **Style**: Wooden crate or military supply box
+- **Color**: Brown (#8b4513) with black outline
+- **States**:
+  - Closed (default)
+  - Opened (different sprite or destroyed version)
+- **Details**: Add rivets, planks, or military markings
+- **Export Format**: PNG with transparency
+- **Current Placeholder**: `client/src/scenes/GameScene.ts` lines 320-347
+
+#### 5. Matchmaking Scene Assets
+- **Loading Spinner**: Animated circular spinner or military-themed loading icon
+  - **Dimensions**: 60x60 pixels
+  - **Style**: Rotating gear, radar sweep, or animated dots
+  - **Color**: Primary theme color
+  - **Current Placeholder**: `client/src/scenes/MatchmakingScene.ts` lines 134-148
+
+- **Cancel Button**: Styled button graphic (optional, can use CSS)
+  - **Dimensions**: 120x40 pixels
+  - **States**: Normal, hover, pressed
+  - **Current Placeholder**: `client/src/scenes/MatchmakingScene.ts` lines 91-128
+
+- **Icons**: Search icon, player count icon, timer icon
+  - **Dimensions**: 24x24 pixels each
+  - **Style**: Simple, clear icons matching theme
+  - **Current Placeholder**: `client/src/scenes/MatchmakingScene.ts` line 180
+
+#### 6. UI Elements
+- **Health Bar**: Gradient fill from green → yellow → red
+- **Minimap Icons**: Small dots or symbols for players
+- **Safe Zone Indicator**: Glowing circle border graphic
+- **Background Grid**: Subtle grid pattern (currently using simple lines)
+
+### Style Guidelines
+
+**Overall Theme**: 
+- Military/warfare aesthetic
+- Top-down perspective
+- Clean, readable sprites (avoid excessive detail at small sizes)
+- Consistent color palette across all assets
+- High contrast for visibility during gameplay
+
+**Color Palette**:
+```
+Primary: #00ff00 (Green - friendly)
+Danger: #ff0000 (Red - enemy/health)
+Warning: #ffff00 (Yellow - caution)
+Info: #00ffff (Cyan - speed/info)
+Neutral: #8b4513 (Brown - crates)
+Background: #f5f5f5 (Light gray)
+Grid: #e0e0e0 (Lighter gray)
+```
+
+**Technical Requirements**:
+- Resolution: High enough for 2x scaling (for retina displays)
+- Transparency: Use alpha channel where needed
+- File Format: PNG-24 with alpha, or SVG for scalable elements
+- Naming Convention: `asset-name-state.png` (e.g., `tank-player-normal.png`)
+- Sprite Sheets: Use TexturePacker or similar format if providing animations
+
+### Animation Specifications
+
+1. **Tank Movement**: Optional tread animation (4-8 frames)
+2. **Bullet Trail**: Particle effect or 2-3 frame fade trail
+3. **Loot Pickup**: Sparkle/collection effect (6-8 frames)
+4. **Crate Opening**: Opening animation (4-6 frames)
+5. **Loading Spinner**: Smooth rotation (8-12 frames or CSS rotation)
+
+### Delivery Format
+
+**Option 1**: Individual Assets
+- Separate PNG files for each asset
+- Organized in folders by type (tanks/, projectiles/, loot/, etc.)
+
+**Option 2**: Sprite Sheets
+- Combined sprite sheets with JSON atlas
+- Use TexturePacker or Phaser-compatible format
+- Include frame data for animations
+
+**Preferred Storage Location**: `client/public/assets/sprites/`
+
+### Priority Order
+
+1. **High Priority** (Needed for MVP):
+   - Tank sprite (player + enemy variants)
+   - Bullet sprite
+   - Basic loot item sprites
+   - Crate sprite
+
+2. **Medium Priority** (Enhances gameplay):
+   - Loading spinner animation
+   - UI icons
+   - Health bar graphics
+   - Minimap icons
+
+3. **Low Priority** (Polish):
+   - Particle effects
+   - Explosion animations
+   - Terrain textures
+   - Weather effects
+
+### Testing Checklist
+
+After generating assets:
+- [ ] Verify sprite dimensions match specifications
+- [ ] Test transparency/alpha channel
+- [ ] Confirm colors match palette
+- [ ] Verify visibility at game zoom level (1x)
+- [ ] Check performance (file size < 50KB per sprite)
+- [ ] Test animation frame rates (if applicable)
+- [ ] Validate against different backgrounds
+- [ ] Ensure sprites are distinguishable from each other
+
+---
+
 ## 📦 Asset Download Checklist
 
 ### Must-Have Assets
@@ -1083,11 +1241,11 @@ npm run preview         # Preview production build
 ## 🎯 Current Status
 
 - ✅ Phase 1: UI Framework Setup
-- ⏳ Phase 2: Authentication UI (NEXT)
-- ⏳ Phase 3: Main Menu Scene
-- ⏳ Phase 4: Game Assets & Sprites
-- ⏳ Phase 5: In-Game HUD Overlay
-- ⏳ Phase 6: Game Scene Implementation
+- ✅ Phase 2: WebSocket Integration
+- ✅ Phase 3: Matchmaking Scene (with placeholder assets)
+- ✅ Phase 4: Game Scene Connected to Go Backend (with placeholder assets)
+- ⏳ Phase 5: AI Asset Generation (NEXT - see Asset Generation Requirements above)
+- ⏳ Phase 6: Client-Side Prediction
 - ⏳ Phase 7: Visual Polish & Effects
 - ⏳ Phase 8: Leaderboard & Match Results
 - ⏳ Phase 9: Settings & Options
@@ -1095,6 +1253,7 @@ npm run preview         # Preview production build
 
 ---
 
-**Last Updated**: November 16, 2025
-**Version**: 1.0.0
-**Next Milestone**: Complete Phase 2 (Authentication UI)
+**Last Updated**: November 18, 2025
+**Version**: 2.0.0 (Go Backend Integration)
+**Next Milestone**: Generate AI assets to replace placeholder graphics
+**Backend Status**: ✅ Fully migrated to Go (API: 8080, Game: 8081)
