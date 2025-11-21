@@ -11,7 +11,7 @@ class App {
   private rootElement: HTMLElement;
   private currentView: HTMLElement | null = null;
   private playerName: string = '';
-  private jwtToken: string = '';
+  // jwtToken stored via authService, not needed as instance variable
 
   constructor() {
     const root = document.getElementById('root');
@@ -58,7 +58,7 @@ class App {
         }
         
         this.playerName = authResponse.user.username;
-        this.jwtToken = authResponse.token;
+        // Token is stored via authService.storeToken() below
         
         // Store token
         authService.storeToken(authResponse.token);

@@ -51,7 +51,7 @@ func NewConnection(conn *websocket.Conn, userID, username string) *Connection {
 		UserID:      userID,
 		Username:    username,
 		conn:        conn,
-		send:        make(chan []byte, 256),
+		send:        make(chan []byte, 2048), // Increased buffer for high-frequency game state updates (30/sec)
 		ctx:         ctx,
 		cancel:      cancel,
 		connectedAt: time.Now(),
@@ -175,7 +175,11 @@ func (c *Connection) Send(messageType string, payload interface{}) error {
 		return nil
 	case <-c.ctx.Done():
 		return context.Canceled
-	case <-time.After(5 * time.Second):
+	case <-time.After(15 * time.Second): // Increased timeout for game state broadcasts
+		logger.Logger.Warn().
+			Str("userId", c.UserID).
+			Str("messageType", messageType).
+			Msg("Send channel full - connection may be slow")
 		return context.DeadlineExceeded
 	}
 }

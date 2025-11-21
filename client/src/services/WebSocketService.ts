@@ -1,5 +1,8 @@
 // WebSocket Service for blast.io multiplayer communication
 
+// Legacy interfaces - kept for reference but unused
+// Game state is now handled by GameScene with server-provided structure
+/*
 interface PlayerState {
   id: string;
   name: string;
@@ -27,6 +30,7 @@ interface GameState {
   safeZoneX: number;
   safeZoneY: number;
 }
+*/
 
 type MessageHandler = (data: any) => void;
 

@@ -1,28 +1,18 @@
 import Phaser from 'phaser';
 import { MAP_WIDTH, MAP_HEIGHT, COLORS } from '../config/constants';
 import { getWebSocketService, GameState, PlayerState, Projectile, Loot, Crate } from '../services/websocket';
+import { Tank } from '../entities/Tank';
 
-// TODO: Replace with AI-generated tank sprite
-const TANK_SIZE = 30;
-// TODO: Replace with AI-generated bullet sprite
-const BULLET_SIZE = 6;
-// TODO: Replace with AI-generated crate sprite
-const CRATE_SIZE = 25;
-// TODO: Replace with AI-generated loot sprite
-const LOOT_SIZE = 15;
-
-interface TankGraphics {
-  body: Phaser.GameObjects.Graphics;
-  healthBar: Phaser.GameObjects.Graphics;
-  nameText: Phaser.GameObjects.Text;
+interface TankData {
+  tank: Tank;
 }
 
 export default class GameScene extends Phaser.Scene {
   private localPlayerId: string | null = null;
-  private tanks: Map<string, TankGraphics> = new Map();
-  private projectileGraphics: Map<string, Phaser.GameObjects.Graphics> = new Map();
-  private lootGraphics: Map<string, Phaser.GameObjects.Graphics> = new Map();
-  private crateGraphics: Map<string, Phaser.GameObjects.Graphics> = new Map();
+  private tanks: Map<string, TankData> = new Map();
+  private projectileSprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
+  private lootSprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
+  private crateSprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
   
   private safeZoneGraphics!: Phaser.GameObjects.Graphics;
   private gridGraphics!: Phaser.GameObjects.Graphics;
@@ -49,8 +39,15 @@ export default class GameScene extends Phaser.Scene {
     super({ key: 'GameScene' });
   }
 
-  create() {
-    console.log('🎮 GameScene: Initializing');
+  create(data: { matchId?: string }) {
+    console.log('🎮 GameScene: Initializing with matchId:', data.matchId);
+
+    // CRITICAL: Prevent scene from pausing when tab loses focus
+    // We need to keep processing WebSocket game state updates for multiplayer
+    this.sys.events.on('pause', () => {
+      console.log('🚫 Preventing GameScene pause for multiplayer');
+      this.sys.resume(); // Immediately resume
+    });
 
     // Set background
     this.cameras.main.setBackgroundColor(COLORS.BACKGROUND);
@@ -75,6 +72,16 @@ export default class GameScene extends Phaser.Scene {
     
     if (!ws.isConnected()) {
       console.error('❌ WebSocket not connected, returning to menu');
+      this.scene.start('MenuScene');
+      return;
+    }
+
+    // Send match:join message to join the match
+    if (data.matchId) {
+      console.log('📤 Sending match:join for matchId:', data.matchId);
+      ws.send('match:join', { matchId: data.matchId });
+    } else {
+      console.error('❌ No matchId provided to GameScene');
       this.scene.start('MenuScene');
       return;
     }
@@ -119,7 +126,11 @@ export default class GameScene extends Phaser.Scene {
     const ws = getWebSocketService();
 
     // Listen for game state updates (30 times per second from server)
-    ws.on('game_state', (state: GameState) => {
+    ws.on('game:state', (state: GameState) => {
+      // Log first game state to confirm we're receiving updates
+      if (state.tick === 1) {
+        console.log('🎮 First game state received! Tick:', state.tick, 'Players:', Object.keys(state.players).length);
+      }
       this.lastGameState = state;
       this.currentTick = state.tick;
       this.updateGameState(state);
@@ -172,12 +183,13 @@ export default class GameScene extends Phaser.Scene {
   private updatePlayers(players: Record<string, PlayerState>) {
     const playerIds = Object.keys(players);
 
+    console.log('🎮 updatePlayers called with', playerIds.length, 'players. Current tanks:', this.tanks.size);
+
     // Remove tanks that no longer exist
-    this.tanks.forEach((graphics, id) => {
+    this.tanks.forEach((tankData, id) => {
       if (!players[id]) {
-        graphics.body.destroy();
-        graphics.healthBar.destroy();
-        graphics.nameText.destroy();
+        console.log('🗑️ Removing tank for player:', id);
+        tankData.tank.destroy();
         this.tanks.delete(id);
       }
     });
@@ -185,100 +197,62 @@ export default class GameScene extends Phaser.Scene {
     // Update or create tanks
     playerIds.forEach(id => {
       const player = players[id];
-      if (!player.isAlive) return;
-
-      let tank = this.tanks.get(id);
-      if (!tank) {
-        tank = this.createTank(id, player);
-        this.tanks.set(id, tank);
+      console.log('🔍 Processing player:', id, 'isAlive:', player.isAlive, 'pos:', player.position);
+      
+      if (!player.isAlive) {
+        console.log('⚰️ Player', id, 'is not alive, skipping');
+        return;
       }
 
-      // Update position and rotation - TODO: Replace with proper sprite rotation
-      tank.body.setPosition(player.position.x, player.position.y);
-      tank.body.clear();
+      let tankData = this.tanks.get(id);
+      if (!tankData) {
+        const isLocal = id === this.localPlayerId;
+        console.log('🆕 Creating new tank for player:', player.username, 'isLocal:', isLocal, 'at position:', player.position);
+        const tank = new Tank(this, player.position.x, player.position.y, player.username, isLocal);
+        tankData = { tank };
+        this.tanks.set(id, tankData);
+        console.log('✅ Tank created! Total tanks now:', this.tanks.size);
+      }
+
+      // Update tank position
+      tankData.tank.setPosition(player.position.x, player.position.y);
       
-      // Draw tank facing the rotation angle
-      // TODO: Replace with AI-generated tank sprite
-      const isLocal = id === this.localPlayerId;
-      const color = isLocal ? 0x00ff00 : 0xff0000;
+      // Update tank body rotation (movement direction)
+      tankData.tank.setBodyRotation(player.rotation);
       
-      // Draw tank body (rotated rectangle)
-      const cos = Math.cos(player.rotation);
-      const sin = Math.sin(player.rotation);
-      const halfSize = TANK_SIZE / 2;
-      
-      tank.body.fillStyle(color, 1);
-      tank.body.fillRect(player.position.x - halfSize, player.position.y - halfSize, TANK_SIZE, TANK_SIZE);
-      
-      // Draw gun barrel pointing in rotation direction
-      tank.body.fillStyle(0x000000, 1);
-      const barrelLength = TANK_SIZE / 2;
-      const barrelWidth = 10;
-      const barrelX = player.position.x + cos * barrelLength / 2;
-      const barrelY = player.position.y + sin * barrelLength / 2;
-      tank.body.fillRect(barrelX - barrelWidth / 2, barrelY - barrelWidth / 2, barrelWidth, barrelLength);
+      // Update turret rotation (aim direction - same as movement for now)
+      tankData.tank.setTurretRotation(player.rotation);
 
       // Update health bar
-      this.updateHealthBar(tank.healthBar, player.health, player.maxHealth);
+      tankData.tank.updateHealthBar(player.health, player.maxHealth);
     });
-  }
-
-  private createTank(_id: string, player: PlayerState): TankGraphics {
-    const body = this.add.graphics();
-    
-    const healthBar = this.add.graphics();
-    
-    const nameText = this.add.text(0, 0, player.username, {
-      fontSize: '12px',
-      color: '#ffffff',
-      stroke: '#000000',
-      strokeThickness: 2,
-    });
-    nameText.setOrigin(0.5, 1);
-
-    return { body, healthBar, nameText };
-  }
-
-  private updateHealthBar(graphics: Phaser.GameObjects.Graphics, health: number, maxHealth: number) {
-    graphics.clear();
-    
-    const barWidth = TANK_SIZE;
-    const barHeight = 4;
-    const healthPercent = health / maxHealth;
-
-    // Background
-    graphics.fillStyle(0x000000, 0.5);
-    graphics.fillRect(-barWidth / 2, 0, barWidth, barHeight);
-
-    // Health
-    const healthColor = healthPercent > 0.5 ? 0x00ff00 : healthPercent > 0.25 ? 0xffff00 : 0xff0000;
-    graphics.fillStyle(healthColor, 1);
-    graphics.fillRect(-barWidth / 2, 0, barWidth * healthPercent, barHeight);
   }
 
   private updateProjectiles(projectiles: Projectile[]) {
     const projectileIds = new Set(projectiles.map(p => p.id));
 
     // Remove old projectiles
-    this.projectileGraphics.forEach((graphics, id) => {
+    this.projectileSprites.forEach((sprite, id) => {
       if (!projectileIds.has(id)) {
-        graphics.destroy();
-        this.projectileGraphics.delete(id);
+        sprite.destroy();
+        this.projectileSprites.delete(id);
       }
     });
 
     // Update or create projectiles
     projectiles.forEach(proj => {
-      let graphics = this.projectileGraphics.get(proj.id);
-      if (!graphics) {
-        graphics = this.add.graphics();
-        // TODO: Replace with AI-generated bullet sprite
-        graphics.fillStyle(0x000000, 1);
-        graphics.fillCircle(0, 0, BULLET_SIZE);
-        this.projectileGraphics.set(proj.id, graphics);
+      let sprite = this.projectileSprites.get(proj.id);
+      if (!sprite) {
+        // Determine bullet color based on owner (green = player, red = enemy)
+        const bulletKey = proj.ownerId === this.localPlayerId ? 'bullet-green' : 'bullet-red';
+        sprite = this.add.sprite(proj.position.x, proj.position.y, bulletKey);
+        sprite.setScale(0.8); // Scale down bullets slightly
+        this.projectileSprites.set(proj.id, sprite);
       }
 
-      graphics.setPosition(proj.position.x, proj.position.y);
+      // Update position and rotation
+      sprite.setPosition(proj.position.x, proj.position.y);
+      sprite.setRotation(proj.velocity ? Math.atan2(proj.velocity.y, proj.velocity.x) : 0);
     });
   }
 
@@ -286,44 +260,45 @@ export default class GameScene extends Phaser.Scene {
     const lootIds = new Set(loot.map(l => l.id));
 
     // Remove old loot
-    this.lootGraphics.forEach((graphics, id) => {
+    this.lootSprites.forEach((sprite, id) => {
       if (!lootIds.has(id)) {
-        graphics.destroy();
-        this.lootGraphics.delete(id);
+        sprite.destroy();
+        this.lootSprites.delete(id);
       }
     });
 
     // Update or create loot
     loot.forEach(item => {
-      let graphics = this.lootGraphics.get(item.id);
-      if (!graphics) {
-        graphics = this.add.graphics();
-        // TODO: Replace with AI-generated loot sprite (different colors for types)
-        const lootColor = this.getLootColor(item.type);
-        graphics.fillStyle(lootColor, 1);
-        // Draw a simple diamond shape
-        graphics.beginPath();
-        graphics.moveTo(0, -LOOT_SIZE);
-        graphics.lineTo(LOOT_SIZE, 0);
-        graphics.lineTo(0, LOOT_SIZE);
-        graphics.lineTo(-LOOT_SIZE, 0);
-        graphics.closePath();
-        graphics.fillPath();
-        this.lootGraphics.set(item.id, graphics);
+      let sprite = this.lootSprites.get(item.id);
+      if (!sprite) {
+        // Map loot type to crate sprite
+        const crateKey = this.getLootCrateKey(item.type);
+        sprite = this.add.sprite(item.position.x, item.position.y, crateKey);
+        sprite.setScale(0.5); // Loot is smaller than crates
+        
+        // Add floating animation
+        this.tweens.add({
+          targets: sprite,
+          y: item.position.y - 5,
+          duration: 1000,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut'
+        });
+        
+        this.lootSprites.set(item.id, sprite);
       }
 
-      graphics.setPosition(item.position.x, item.position.y);
+      sprite.setPosition(item.position.x, item.position.y);
     });
   }
 
-  private getLootColor(type: string): number {
+  private getLootCrateKey(type: string): string {
     switch (type) {
-      case 'health': return 0xff0000;
-      case 'armor': return 0x0000ff;
-      case 'damage': return 0xff8800;
-      case 'speed': return 0x00ffff;
-      case 'fire_rate': return 0xff00ff;
-      default: return 0xffffff;
+      case 'health': return 'crate-health'; // Green crate
+      case 'armor': return 'crate-armor';   // Red crate
+      case 'ammo': return 'crate-ammo';     // Grey crate
+      default: return 'crate-ammo';
     }
   }
 
@@ -331,10 +306,10 @@ export default class GameScene extends Phaser.Scene {
     const crateIds = new Set(crates.map(c => c.id));
 
     // Remove old crates
-    this.crateGraphics.forEach((graphics, id) => {
+    this.crateSprites.forEach((sprite, id) => {
       if (!crateIds.has(id)) {
-        graphics.destroy();
-        this.crateGraphics.delete(id);
+        sprite.destroy();
+        this.crateSprites.delete(id);
       }
     });
 
@@ -342,26 +317,27 @@ export default class GameScene extends Phaser.Scene {
     crates.forEach(crate => {
       if (crate.isOpened) {
         // Remove opened crates
-        const graphics = this.crateGraphics.get(crate.id);
-        if (graphics) {
-          graphics.destroy();
-          this.crateGraphics.delete(crate.id);
+        const sprite = this.crateSprites.get(crate.id);
+        if (sprite) {
+          sprite.destroy();
+          this.crateSprites.delete(crate.id);
         }
         return;
       }
 
-      let graphics = this.crateGraphics.get(crate.id);
-      if (!graphics) {
-        graphics = this.add.graphics();
-        // TODO: Replace with AI-generated crate sprite
-        graphics.fillStyle(0x8b4513, 1);
-        graphics.fillRect(-CRATE_SIZE / 2, -CRATE_SIZE / 2, CRATE_SIZE, CRATE_SIZE);
-        graphics.lineStyle(2, 0x000000, 1);
-        graphics.strokeRect(-CRATE_SIZE / 2, -CRATE_SIZE / 2, CRATE_SIZE, CRATE_SIZE);
-        this.crateGraphics.set(crate.id, graphics);
+      let sprite = this.crateSprites.get(crate.id);
+      if (!sprite) {
+        // Randomly select crate type
+        const crateTypes = ['crate-health', 'crate-armor', 'crate-ammo'];
+        const crateKey = crateTypes[Math.floor(Math.random() * crateTypes.length)];
+        
+        sprite = this.add.sprite(crate.position.x, crate.position.y, crateKey);
+        sprite.setScale(0.75); // Crates are slightly larger than loot
+        
+        this.crateSprites.set(crate.id, sprite);
       }
 
-      graphics.setPosition(crate.position.x, crate.position.y);
+      sprite.setPosition(crate.position.x, crate.position.y);
     });
   }
 

@@ -416,7 +416,7 @@ export function createAuthScreen(onPlay: AuthCallback): HTMLElement {
   function handleQuickPlay() {
     const name = quickPlayInput.value.trim();
     if (name.length >= 3 && name.length <= 15) {
-      localStorage.setItem('blast-io-player-name', name);
+      // Don't save Quick Play names - they're temporary players not associated with accounts
       onPlay(name, 'quick');
     }
   }
@@ -456,11 +456,15 @@ export function createAuthScreen(onPlay: AuthCallback): HTMLElement {
     }
   });
 
-  // Load saved name
+  // Load saved name for authenticated users (Sign In/Register)
+  // Quick Play users should enter a name each time (temporary players)
   const savedName = localStorage.getItem('blast-io-player-name');
-  if (savedName) {
-    quickPlayInput.value = savedName;
-    quickPlayInput.dispatchEvent(new Event('input'));
+  const wasRegistered = localStorage.getItem('blast-io-registered') === 'true';
+  
+  if (savedName && wasRegistered) {
+    // Pre-fill for registered/signed-in users only
+    signinUsername.value = savedName;
+    signinUsername.dispatchEvent(new Event('input'));
   }
 
   return container;

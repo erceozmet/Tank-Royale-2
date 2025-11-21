@@ -20,10 +20,29 @@ run-game:
 test:
 	go test -v ./...
 
+# Run unit tests only (skip integration)
+test-unit:
+	go test -short -v ./...
+
+# Run integration tests only
+test-integration:
+	@echo "Running integration tests (requires Redis)..."
+	go test -v ./tests/integration/... -timeout 60s
+
 # Run tests with coverage
 test-coverage:
 	go test -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out
+
+# Run unit tests with coverage
+test-unit-coverage:
+	go test -short -coverprofile=coverage-unit.out ./...
+	go tool cover -html=coverage-unit.out
+
+# Run integration tests with coverage
+test-integration-coverage:
+	go test -coverprofile=coverage-integration.out ./tests/integration/...
+	go tool cover -html=coverage-integration.out
 
 # Run benchmarks
 bench:

@@ -23,13 +23,13 @@ describe('APIClient', () => {
       post: vi.fn(),
       interceptors: {
         request: {
-          use: vi.fn((fn) => {
+          use: vi.fn((_fn) => {
             // Just return the function for simplicity
             return 0;
           }),
         } as any,
         response: {
-          use: vi.fn((successFn) => {
+          use: vi.fn((_successFn) => {
             // Just return the function for simplicity
             return 0;
           }),

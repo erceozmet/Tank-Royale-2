@@ -323,7 +323,13 @@ describe('WebSocketManager', () => {
     it('should send player input messages', () => {
       const sendSpy = vi.spyOn(wsManager, 'send');
       
-      const input = { x: 100, y: 200, angle: 1.57 };
+      const input = { 
+        sequence: 1,
+        timestamp: Date.now(),
+        movement: { forward: true, backward: false, left: false, right: false },
+        rotation: 1.57,
+        shoot: false
+      };
       wsManager.sendPlayerInput(input);
       
       expect(sendSpy).toHaveBeenCalledWith('player_input', input);
@@ -332,7 +338,11 @@ describe('WebSocketManager', () => {
     it('should send shoot messages', () => {
       const sendSpy = vi.spyOn(wsManager, 'send');
       
-      const shoot = { targetX: 500, targetY: 600 };
+      const shoot = { 
+        timestamp: Date.now(),
+        rotation: 1.57,
+        position: { x: 500, y: 600 }
+      };
       wsManager.sendShoot(shoot);
       
       expect(sendSpy).toHaveBeenCalledWith('shoot', shoot);
@@ -341,7 +351,7 @@ describe('WebSocketManager', () => {
     it('should send collect loot messages', () => {
       const sendSpy = vi.spyOn(wsManager, 'send');
       
-      const loot = { lootId: 'loot-123' };
+      const loot = { loot_id: 'loot-123' };
       wsManager.sendCollectLoot(loot);
       
       expect(sendSpy).toHaveBeenCalledWith('collect_loot', loot);
@@ -350,7 +360,7 @@ describe('WebSocketManager', () => {
     it('should send switch weapon messages', () => {
       const sendSpy = vi.spyOn(wsManager, 'send');
       
-      const weapon = { weaponType: 'rifle' };
+      const weapon = { weapon_type: 'rifle' as any };
       wsManager.sendSwitchWeapon(weapon);
       
       expect(sendSpy).toHaveBeenCalledWith('switch_weapon', weapon);

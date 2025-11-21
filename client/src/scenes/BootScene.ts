@@ -13,12 +13,64 @@ export default class BootScene extends Phaser.Scene {
     // Display loading progress
     this.createLoadingBar();
 
-    // Load assets (currently using graphics, so minimal loading)
     console.log('📦 BootScene: Loading blast.io...');
+
+    // Load tank sprites (body + turret separate for rotation)
+    // Player = green, Enemies = red
+    this.load.image('tank-body-green', '/assets/sprites/tanks/tankGreen.png');
+    this.load.image('tank-body-red', '/assets/sprites/tanks/tankRed.png');
+    this.load.image('tank-turret-green', '/assets/sprites/tanks/turret-green.png');
+    this.load.image('tank-turret-red', '/assets/sprites/tanks/turret-red.png');
+
+    // Load bullet sprites (green for player, red for enemies)
+    this.load.image('bullet-green', '/assets/sprites/weapons/bulletGreen.png');
+    this.load.image('bullet-red', '/assets/sprites/weapons/bulletRed.png');
+
+    // Load loot crate sprites
+    // Health = green, Armor = red/orange, Ammo = grey
+    this.load.image('crate-health', '/assets/sprites/loot/crate-health.png');
+    this.load.image('crate-armor', '/assets/sprites/loot/crate-armor.png');
+    this.load.image('crate-ammo', '/assets/sprites/loot/crate-ammo.png');
+
+    // Load explosion/smoke animation (always grey smoke)
+    for (let i = 0; i <= 5; i++) {
+      this.load.image(`explosion-orange-${i}`, `/assets/sprites/effects/smokeOrange${i}.png`);
+      this.load.image(`smoke-grey-${i}`, `/assets/sprites/effects/smokeGrey${i}.png`);
+    }
   }
 
   create() {
     console.log('✅ BootScene: blast.io initialized');
+
+    // Create explosion animation
+    this.anims.create({
+      key: 'explosion',
+      frames: [
+        { key: 'explosion-orange-0' },
+        { key: 'explosion-orange-1' },
+        { key: 'explosion-orange-2' },
+        { key: 'explosion-orange-3' },
+        { key: 'explosion-orange-4' },
+        { key: 'explosion-orange-5' },
+      ],
+      frameRate: 12,
+      repeat: 0,
+      hideOnComplete: true,
+    });
+
+    // Create smoke trail animation
+    this.anims.create({
+      key: 'smoke-trail',
+      frames: [
+        { key: 'smoke-grey-0' },
+        { key: 'smoke-grey-1' },
+        { key: 'smoke-grey-2' },
+        { key: 'smoke-grey-3' },
+      ],
+      frameRate: 10,
+      repeat: 0,
+      hideOnComplete: true,
+    });
     
     // Skip MenuScene - go directly to matchmaking since auth is handled by React
     this.scene.start('MatchmakingScene');

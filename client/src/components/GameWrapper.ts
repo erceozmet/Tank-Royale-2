@@ -7,7 +7,7 @@ import { createMinimap } from './Minimap';
 
 export function createGameWrapper(
   playerName: string,
-  onQuit: () => void
+  _onQuit: () => void // Prefix with _ to indicate intentionally unused
 ): HTMLElement {
   const container = document.createElement('div');
   container.className = 'relative w-full h-full overflow-hidden';
@@ -47,15 +47,26 @@ export function createGameWrapper(
       parent: 'phaser-game',
     });
 
+    // CRITICAL: Prevent Phaser from pausing when tab loses focus
+    // For multiplayer, we MUST keep processing WebSocket updates even in background
+    game.events.on('pause', () => {
+      console.log('🚫 Preventing Phaser pause for multiplayer');
+      game.loop.sleep(); // Don't pause, just sleep the loop (keeps scenes active)
+      game.loop.wake(); // Immediately wake it back up
+    });
+    
     // Pass player name to game
     game.registry.set('playerName', playerName);
 
-    // Handle page visibility (pause/resume)
+    // Handle page visibility
+    // For multiplayer games, we MUST keep game loop running to receive state updates
+    // even when tab is in background, otherwise we'll miss game state and get out of sync
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
-        game.pause();
+        console.log('⏸️ Tab hidden - but keeping game loop active for multiplayer');
+        // Don't pause anything - game must keep running to receive WebSocket updates
       } else {
-        game.resume();
+        console.log('▶️ Tab visible');
       }
     });
 
