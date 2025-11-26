@@ -42,13 +42,13 @@ class App {
   }
 
   private renderAuthScreen(): HTMLElement {
-    return createAuthScreen(async (name: string, type: 'quick' | 'login' | 'register', data?: any) => {
+    return createAuthScreen(async (_name: string, type: 'quick' | 'login' | 'register', data?: any) => {
       try {
         let authResponse;
         
         if (type === 'quick') {
-          // Quick play - guest registration
-          authResponse = await authService.quickPlay(name);
+          // Quick play - guest session (no name needed, server assigns one)
+          authResponse = await authService.quickPlay();
         } else if (type === 'login') {
           // Sign in with existing account
           authResponse = await authService.login(data);

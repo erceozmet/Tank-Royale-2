@@ -33,7 +33,7 @@ export default class GameOverScene extends Phaser.Scene {
     
     if (!localResult) {
       console.error('❌ GameOverScene: Local player result not found');
-      this.scene.start('MenuScene');
+      this.scene.start('MatchmakingScene');
       return;
     }
 
@@ -129,7 +129,7 @@ export default class GameOverScene extends Phaser.Scene {
     });
     
     menuButton.on('pointerdown', () => {
-      this.scene.start('MenuScene');
+      this.scene.start('MatchmakingScene');
     });
   }
 }

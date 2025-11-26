@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/erceozmet/tank-royale-2/go-server/internal/cache"
 	"github.com/erceozmet/tank-royale-2/go-server/internal/db/postgres"
 	"github.com/erceozmet/tank-royale-2/go-server/internal/db/redis"
 	"github.com/erceozmet/tank-royale-2/go-server/internal/game"
@@ -36,9 +38,10 @@ type QueueEntry struct {
 
 // MatchmakingService handles matchmaking operations
 type MatchmakingService struct {
-	pgDB     *postgres.DB
-	redisDB  *redis.DB
-	userRepo *repositories.UserRepository
+	pgDB           *postgres.DB
+	redisDB        *redis.DB
+	userRepo       *repositories.UserRepository
+	sessionManager *cache.SessionManager
 
 	activeMatches map[string]*match.Match
 	matchesMu     sync.RWMutex
@@ -53,12 +56,13 @@ func NewMatchmakingService(pgDB *postgres.DB, redisDB *redis.DB) *MatchmakingSer
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &MatchmakingService{
-		pgDB:          pgDB,
-		redisDB:       redisDB,
-		userRepo:      repositories.NewUserRepository(pgDB, redisDB),
-		activeMatches: make(map[string]*match.Match),
-		ctx:           ctx,
-		cancel:        cancel,
+		pgDB:           pgDB,
+		redisDB:        redisDB,
+		userRepo:       repositories.NewUserRepository(pgDB, redisDB),
+		sessionManager: cache.NewSessionManager(redisDB.Client),
+		activeMatches:  make(map[string]*match.Match),
+		ctx:            ctx,
+		cancel:         cancel,
 	}
 }
 
@@ -81,20 +85,42 @@ func (s *MatchmakingService) Stop() {
 
 // JoinQueue adds a player to the matchmaking queue
 func (s *MatchmakingService) JoinQueue(ctx context.Context, userID string) error {
-	// Get user data
-	user, err := s.userRepo.FindByID(ctx, userID)
-	if err != nil {
-		return fmt.Errorf("failed to get user: %w", err)
-	}
-	if user == nil {
-		return fmt.Errorf("user not found")
+	// First, remove any existing entry for this user to prevent duplicates
+	s.LeaveQueue(ctx, userID)
+
+	var username string
+	var mmr int
+
+	// Check if this is a guest user (ID starts with "guest_")
+	if strings.HasPrefix(userID, "guest_") {
+		// Get guest data from Redis session
+		session, err := s.sessionManager.GetSession(ctx, userID)
+		if err != nil {
+			return fmt.Errorf("failed to get guest session: %w", err)
+		}
+		if session == nil {
+			return fmt.Errorf("guest session not found")
+		}
+		username = session.Username
+		mmr = 1000 // Default MMR for guests
+	} else {
+		// Get user data from database
+		user, err := s.userRepo.FindByID(ctx, userID)
+		if err != nil {
+			return fmt.Errorf("failed to get user: %w", err)
+		}
+		if user == nil {
+			return fmt.Errorf("user not found")
+		}
+		username = user.Username
+		mmr = user.MMR
 	}
 
 	// Create queue entry
 	entry := QueueEntry{
 		UserID:   userID,
-		Username: user.Username,
-		MMR:      user.MMR,
+		Username: username,
+		MMR:      mmr,
 		JoinedAt: time.Now(),
 	}
 
@@ -107,7 +133,7 @@ func (s *MatchmakingService) JoinQueue(ctx context.Context, userID string) error
 	queueKey := "matchmaking:queue"
 
 	err = s.redisDB.Client.ZAdd(ctx, queueKey, goredis.Z{
-		Score:  float64(user.MMR),
+		Score:  float64(mmr),
 		Member: string(entryJSON),
 	}).Err()
 
@@ -115,7 +141,7 @@ func (s *MatchmakingService) JoinQueue(ctx context.Context, userID string) error
 		return fmt.Errorf("failed to add to queue: %w", err)
 	}
 
-	fmt.Printf("Player %s joined matchmaking queue (MMR: %d)\n", user.Username, user.MMR)
+	fmt.Printf("Player %s joined matchmaking queue (MMR: %d)\n", username, mmr)
 
 	return nil
 }

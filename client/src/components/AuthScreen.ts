@@ -78,31 +78,19 @@ export function createAuthScreen(onPlay: AuthCallback): HTMLElement {
         <div id="quick-play-form" class="card-elegant w-full">
           <div class="text-center mb-4">
             <h2 class="text-2xl font-bold text-gray-900">Jump In</h2>
-            <p class="text-sm text-gray-500 mt-1">No account needed • Play instantly</p>
+            <p class="text-sm text-gray-500 mt-1">No account needed • Play instantly as a guest</p>
           </div>
           
           <div class="space-y-4">
-            <div>
-              <label for="quick-play-name" class="block text-sm font-semibold text-gray-700 mb-2">
-                Your Name
-              </label>
-              <input
-                type="text"
-                id="quick-play-name"
-                class="input-elegant"
-                placeholder="Enter 3-15 characters"
-                maxlength="15"
-                autocomplete="off"
-              />
-            </div>
-            
             <button
               id="quick-play-button"
-              class="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled
+              class="btn-primary w-full pulse-glow"
             >
               PLAY NOW
             </button>
+            <p class="text-xs text-center text-gray-400">
+              Guest sessions expire after 2 hours
+            </p>
           </div>
         </div>
 
@@ -304,7 +292,6 @@ export function createAuthScreen(onPlay: AuthCallback): HTMLElement {
   const signinForm = container.querySelector('#signin-form') as HTMLDivElement;
   const registerForm = container.querySelector('#register-form') as HTMLDivElement;
   
-  const quickPlayInput = container.querySelector('#quick-play-name') as HTMLInputElement;
   const quickPlayButton = container.querySelector('#quick-play-button') as HTMLButtonElement;
   
   const signinUsername = container.querySelector('#signin-username') as HTMLInputElement;
@@ -339,22 +326,6 @@ export function createAuthScreen(onPlay: AuthCallback): HTMLElement {
   quickPlayTab.addEventListener('click', () => switchTab(quickPlayTab, quickPlayForm));
   signinTab.addEventListener('click', () => switchTab(signinTab, signinForm));
   registerTab.addEventListener('click', () => switchTab(registerTab, registerForm));
-
-  // Quick Play validation
-  quickPlayInput.addEventListener('input', () => {
-    const name = quickPlayInput.value.trim();
-    const isValid = name.length >= 3 && name.length <= 15;
-    
-    quickPlayButton.disabled = !isValid;
-    
-    if (isValid) {
-      quickPlayButton.classList.remove('opacity-50', 'cursor-not-allowed');
-      quickPlayButton.classList.add('pulse-glow');
-    } else {
-      quickPlayButton.classList.add('opacity-50', 'cursor-not-allowed');
-      quickPlayButton.classList.remove('pulse-glow');
-    }
-  });
 
   // Register form validation
   function validateRegisterForm() {
@@ -396,13 +367,6 @@ export function createAuthScreen(onPlay: AuthCallback): HTMLElement {
   signinUsername.addEventListener('input', validateSignInForm);
   signinPassword.addEventListener('input', validateSignInForm);
 
-  // Quick Play - Enter key
-  quickPlayInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter' && !quickPlayButton.disabled) {
-      handleQuickPlay();
-    }
-  });
-
   // Sign In - Enter key
   signinPassword.addEventListener('keypress', (e) => {
     if (e.key === 'Enter' && !signinButton.disabled) {
@@ -410,15 +374,12 @@ export function createAuthScreen(onPlay: AuthCallback): HTMLElement {
     }
   });
 
-  // Quick Play button
+  // Quick Play button - instant guest play
   quickPlayButton.addEventListener('click', handleQuickPlay);
 
   function handleQuickPlay() {
-    const name = quickPlayInput.value.trim();
-    if (name.length >= 3 && name.length <= 15) {
-      // Don't save Quick Play names - they're temporary players not associated with accounts
-      onPlay(name, 'quick');
-    }
+    // Guest play - no name needed, server generates guest ID
+    onPlay('', 'quick');
   }
 
   // Sign In button

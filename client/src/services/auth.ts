@@ -66,18 +66,23 @@ export async function login(data: LoginData): Promise<AuthResponse> {
 }
 
 /**
- * Quick play - register with random password for guest play
+ * Quick play - create guest session without database persistence
+ * Guest sessions automatically expire after 2 hours
  */
-export async function quickPlay(username: string): Promise<AuthResponse> {
-  // Generate random password for guest account
-  const randomPassword = `Guest_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-  const email = `${username}@guest.blast.io`;
-
-  return register({
-    username,
-    email,
-    password: randomPassword,
+export async function quickPlay(): Promise<AuthResponse> {
+  const response = await fetch(`${API_URL}/guest`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
   });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Guest session failed' }));
+    throw new Error(error.error || 'Guest session failed');
+  }
+
+  return response.json();
 }
 
 /**

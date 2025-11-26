@@ -81,7 +81,7 @@ export default class LobbyScene extends Phaser.Scene {
       } catch (error) {
         console.error('Error leaving matchmaking:', error);
       }
-      this.scene.start('MenuScene');
+      this.scene.start('MatchmakingScene');
     });
 
     // Connect to WebSocket
@@ -94,7 +94,7 @@ export default class LobbyScene extends Phaser.Scene {
     } catch (error) {
       console.error('Failed to connect to game server:', error);
       this.statusText.setText('Connection failed');
-      setTimeout(() => this.scene.start('MenuScene'), 3000);
+      setTimeout(() => this.scene.start('MatchmakingScene'), 3000);
     }
 
     console.log('✅ LobbyScene: Waiting for players...');

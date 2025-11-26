@@ -182,9 +182,10 @@ export default class MatchmakingScene extends Phaser.Scene {
       this.statusText.setText('Failed to join queue');
       this.statusText.setColor('#ff4444');
       
-      // Return to menu after error
+      // Stay on matchmaking screen and allow retry
       this.time.delayedCall(2000, () => {
-        this.scene.start('MenuScene');
+        this.statusText.setText('Click "Find Match" to try again');
+        this.statusText.setColor('#ffffff');
       });
     }
   }
@@ -203,8 +204,10 @@ export default class MatchmakingScene extends Phaser.Scene {
     // Clean up
     this.stopStatusPolling();
     
-    // Return to menu
-    this.scene.start('MenuScene');
+    // Reset UI to initial state (stay on matchmaking screen)
+    this.statusText.setText('Queue cancelled');
+    this.statusText.setColor('#ffffff');
+    this.playersInQueueText.setText('');
   }
 
   private startStatusPolling() {
@@ -287,11 +290,9 @@ export default class MatchmakingScene extends Phaser.Scene {
       });
     } catch (error) {
       console.error('❌ Failed to connect to game server:', error);
-      this.statusText.setText('Connection failed. Returning to menu...');
+      this.statusText.setText('Connection failed. Try again.');
       this.statusText.setColor('#ff4444');
-      this.time.delayedCall(2000, () => {
-        this.scene.start('MenuScene');
-      });
+      // Stay on matchmaking screen, allow retry
     }
   }
 

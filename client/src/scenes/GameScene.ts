@@ -67,8 +67,8 @@ export default class GameScene extends Phaser.Scene {
     this.localPlayerId = ws.getUserId();
     
     if (!ws.isConnected()) {
-      console.error('❌ WebSocket not connected, returning to menu');
-      this.scene.start('MenuScene');
+      console.error('❌ WebSocket not connected, returning to matchmaking');
+      this.scene.start('MatchmakingScene');
       return;
     }
 
@@ -77,7 +77,7 @@ export default class GameScene extends Phaser.Scene {
       ws.send('match:join', { matchId: data.matchId });
     } else {
       console.error('❌ No matchId provided to GameScene');
-      this.scene.start('MenuScene');
+      this.scene.start('MatchmakingScene');
       return;
     }
 
