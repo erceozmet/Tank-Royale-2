@@ -63,6 +63,16 @@ else
     wait_for_service localhost 5432 "PostgreSQL"
 fi
 
+# Initialize PostgreSQL schema if needed
+echo "🔄 Checking PostgreSQL schema..."
+if ! podman exec tank-postgres psql -U tank_user -d tank_royale -c "SELECT 1 FROM users LIMIT 1" >/dev/null 2>&1; then
+    echo "📋 Initializing database schema..."
+    podman exec -i tank-postgres psql -U tank_user -d tank_royale < "$PROJECT_ROOT/database/postgres/schema.sql"
+    echo "✅ Database schema initialized"
+else
+    echo "✅ Database schema already exists"
+fi
+
 # Redis
 if is_container_running "tank-redis"; then
     echo "✅ Redis already running"

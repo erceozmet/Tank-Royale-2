@@ -16,6 +16,7 @@ type SessionData struct {
 	Username  string    `json:"username"`
 	Email     string    `json:"email"`
 	Token     string    `json:"token"`
+	IsGuest   bool      `json:"isGuest"`   // True for quick play guest sessions
 	CreatedAt time.Time `json:"createdAt"`
 	LastSeen  time.Time `json:"lastSeen"`
 }
@@ -31,11 +32,12 @@ func NewSessionManager(client *redis.Client) *SessionManager {
 }
 
 const (
-	sessionPrefix = "session:"
-	sessionTTL    = 7 * 24 * time.Hour // 7 days
+	sessionPrefix   = "session:"
+	sessionTTL      = 7 * 24 * time.Hour // 7 days for registered users
+	guestSessionTTL = 2 * time.Hour      // 2 hours for guest sessions
 )
 
-// SetSession stores a user session in Redis with 7-day TTL
+// SetSession stores a user session in Redis with appropriate TTL
 func (sm *SessionManager) SetSession(ctx context.Context, userID string, data SessionData) error {
 	key := fmt.Sprintf("%s%s", sessionPrefix, userID)
 
@@ -52,11 +54,17 @@ func (sm *SessionManager) SetSession(ctx context.Context, userID string, data Se
 		return fmt.Errorf("failed to marshal session data: %w", err)
 	}
 
+	// Use shorter TTL for guest sessions
+	ttl := sessionTTL
+	if data.IsGuest {
+		ttl = guestSessionTTL
+	}
+
 	// Track cache operation duration
 	start := time.Now()
 
 	// Store with TTL
-	if err := sm.client.Set(ctx, key, sessionJSON, sessionTTL).Err(); err != nil {
+	if err := sm.client.Set(ctx, key, sessionJSON, ttl).Err(); err != nil {
 		return fmt.Errorf("failed to set session in Redis: %w", err)
 	}
 

@@ -490,6 +490,42 @@ func registerGameHandlers(
 					Str("matchId", matchID).
 					Msg("Game state broadcast goroutine ended")
 			}(payload.MatchID, m)
+
+			// Start broadcasting match events (like match_ended)
+			go func(matchID string, m *match.Match) {
+				logger.Logger.Info().
+					Str("matchId", matchID).
+					Msg("Starting match event broadcast goroutine")
+
+				eventChan := m.GetEventChannel()
+
+				for event := range eventChan {
+					// Send match event to all players in the match
+					sentCount := 0
+					for _, player := range m.Players {
+						if playerConn, ok := connManager.Get(player.UserID); ok {
+							playerConn.Send(event.Type, event.Data)
+							sentCount++
+						} else {
+							logger.Logger.Warn().
+								Str("userId", player.UserID).
+								Str("matchId", matchID).
+								Str("eventType", event.Type).
+								Msg("Player connection not found for event broadcast")
+						}
+					}
+
+					logger.Logger.Info().
+						Str("matchId", matchID).
+						Str("eventType", event.Type).
+						Int("sentCount", sentCount).
+						Msg("Match event broadcasted to players")
+				}
+
+				logger.Logger.Info().
+					Str("matchId", matchID).
+					Msg("Match event broadcast goroutine ended")
+			}(payload.MatchID, m)
 		}
 	})
 

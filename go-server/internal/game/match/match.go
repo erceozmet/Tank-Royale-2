@@ -17,6 +17,12 @@ import (
 	"github.com/erceozmet/tank-royale-2/go-server/internal/repositories"
 )
 
+// MatchEvent represents a custom match event
+type MatchEvent struct {
+	Type string                 `json:"type"`
+	Data map[string]interface{} `json:"data"`
+}
+
 // Match represents a game match
 type Match struct {
 	ID           string
@@ -31,6 +37,9 @@ type Match struct {
 
 	// Database connections
 	pgDB *postgres.DB
+
+	// Custom event channel for match events (like match_ended)
+	eventChan chan MatchEvent
 
 	mu     sync.RWMutex
 	ctx    context.Context
@@ -58,6 +67,7 @@ func NewMatch(matchID string, pgDB *postgres.DB) *Match {
 		CrateManager: loot.NewCrateManager(),
 		Phase:        engine.PhaseWaiting,
 		pgDB:         pgDB,
+		eventChan:    make(chan MatchEvent, 10),
 		ctx:          ctx,
 		cancel:       cancel,
 	}
@@ -227,7 +237,7 @@ func (m *Match) endMatch() {
 	// Stop game loop
 	m.GameLoop.Stop()
 
-	// Save results to database
+	// Save results to database and broadcast match ended
 	go m.saveResults()
 
 	// After a short delay, mark as finished
@@ -236,6 +246,9 @@ func (m *Match) endMatch() {
 		m.Phase = engine.PhaseFinished
 		m.mu.Unlock()
 		m.cancel()
+
+		// Close event channel
+		close(m.eventChan)
 	})
 }
 
@@ -274,6 +287,15 @@ func (m *Match) saveResults() {
 	// Save player results
 	rankings := state.GetFinalRankings()
 
+	// Check if there are any rankings
+	if len(rankings) == 0 {
+		fmt.Printf("No rankings to save for match %s\n", m.ID)
+		return
+	}
+
+	// Prepare results for broadcasting
+	playerResults := make([]map[string]interface{}, 0, len(rankings))
+
 	for _, ranking := range rankings {
 		// Calculate MMR change based on placement
 		mmrChange := calculateMMRChange(ranking.Placement, len(rankings))
@@ -307,6 +329,28 @@ func (m *Match) saveResults() {
 		if err := matchRepo.UpdateStats(ctx, ranking.UserID, ranking.Placement, ranking.Kills, deaths); err != nil {
 			fmt.Printf("Error updating stats for %s: %v\n", ranking.UserID, err)
 		}
+
+		// Add to results for broadcasting
+		playerResults = append(playerResults, map[string]interface{}{
+			"user_id":       ranking.UserID,
+			"username":      ranking.Username,
+			"placement":     ranking.Placement,
+			"kills":         ranking.Kills,
+			"damage_dealt":  ranking.DamageDealt,
+			"survival_time": duration,
+			"mmr_change":    mmrChange,
+		})
+	}
+
+	// Broadcast match ended event to all players
+	m.eventChan <- MatchEvent{
+		Type: "match_ended",
+		Data: map[string]interface{}{
+			"match_id":  m.ID,
+			"duration":  duration,
+			"rankings":  playerResults,
+			"winner_id": rankings[0].UserID,
+		},
 	}
 
 	fmt.Printf("Match %s results saved successfully\n", m.ID)
@@ -354,4 +398,9 @@ func (m *Match) IsFinished() bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.Phase == engine.PhaseFinished
+}
+
+// GetEventChannel returns the match event channel
+func (m *Match) GetEventChannel() <-chan MatchEvent {
+	return m.eventChan
 }

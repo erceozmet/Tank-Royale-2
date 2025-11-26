@@ -14,11 +14,12 @@ const (
 
 // Player represents a player in the game
 type Player struct {
-	ID       string   `json:"id"`
-	Username string   `json:"username"`
-	Position Vector2D `json:"position"`
-	Rotation float64  `json:"rotation"` // angle in radians
-	Velocity Vector2D `json:"velocity"`
+	ID             string   `json:"id"`
+	Username       string   `json:"username"`
+	Position       Vector2D `json:"position"`
+	Rotation       float64  `json:"rotation"`        // Body rotation (movement direction) in radians
+	TurretRotation float64  `json:"turret_rotation"` // Turret rotation (aim direction) in radians
+	Velocity       Vector2D `json:"velocity"`
 
 	// Health system
 	Health       int `json:"health"`       // Base health (max 100)

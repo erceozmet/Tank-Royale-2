@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { MAP_WIDTH, MAP_HEIGHT, COLORS } from '../config/constants';
+import { MAP_WIDTH, MAP_HEIGHT } from '../config/constants';
 import { getWebSocketService, GameState, PlayerState, Projectile, Loot, Crate } from '../services/websocket';
 import { Tank } from '../entities/Tank';
 
@@ -15,7 +15,6 @@ export default class GameScene extends Phaser.Scene {
   private crateSprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
   
   private safeZoneGraphics!: Phaser.GameObjects.Graphics;
-  private gridGraphics!: Phaser.GameObjects.Graphics;
   
   private lastGameState: GameState | null = null;
   private currentTick: number = 0;
@@ -40,21 +39,18 @@ export default class GameScene extends Phaser.Scene {
   }
 
   create(data: { matchId?: string }) {
-    console.log('🎮 GameScene: Initializing with matchId:', data.matchId);
-
     // CRITICAL: Prevent scene from pausing when tab loses focus
     // We need to keep processing WebSocket game state updates for multiplayer
     this.sys.events.on('pause', () => {
-      console.log('🚫 Preventing GameScene pause for multiplayer');
       this.sys.resume(); // Immediately resume
     });
 
     // Set background
-    this.cameras.main.setBackgroundColor(COLORS.BACKGROUND);
+    this.cameras.main.setBackgroundColor(0x2d4a2b); // Dark green base
     this.physics.world.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
 
-    // Create grid
-    this.createGrid();
+    // Create procedural terrain background
+    this.createTerrainBackground();
 
     // Create safe zone graphics
     this.safeZoneGraphics = this.add.graphics();
@@ -78,7 +74,6 @@ export default class GameScene extends Phaser.Scene {
 
     // Send match:join message to join the match
     if (data.matchId) {
-      console.log('📤 Sending match:join for matchId:', data.matchId);
       ws.send('match:join', { matchId: data.matchId });
     } else {
       console.error('❌ No matchId provided to GameScene');
@@ -87,22 +82,38 @@ export default class GameScene extends Phaser.Scene {
     }
 
     this.setupWebSocketHandlers();
-    
-    console.log('✅ GameScene ready, waiting for game state from server');
   }
 
-  private createGrid() {
-    this.gridGraphics = this.add.graphics();
-    this.gridGraphics.lineStyle(1, COLORS.GRID, 0.5);
-
-    // Draw vertical lines every 100 pixels
-    for (let x = 0; x <= MAP_WIDTH; x += 100) {
-      this.gridGraphics.lineBetween(x, 0, x, MAP_HEIGHT);
-    }
-
-    // Draw horizontal lines every 100 pixels
-    for (let y = 0; y <= MAP_HEIGHT; y += 100) {
-      this.gridGraphics.lineBetween(0, y, MAP_WIDTH, y);
+  private createTerrainBackground() {
+    // Create procedural terrain using simple rectangles
+    // Colors: grass (green) and dirt (brown)
+    const grassColor = 0x3a5a38; // Medium green
+    const dirtColor = 0x6b5344;  // Brown
+    const tileSize = 64; // Size of each tile
+    
+    const terrainGraphics = this.add.graphics();
+    terrainGraphics.setDepth(-100); // Behind everything
+    
+    // Create a seeded random for consistent terrain
+    const seed = 12345;
+    let random = seed;
+    const seededRandom = () => {
+      random = (random * 9301 + 49297) % 233280;
+      return random / 233280;
+    };
+    
+    // Fill the map with tiles (60% grass, 40% dirt)
+    for (let y = 0; y < MAP_HEIGHT; y += tileSize) {
+      for (let x = 0; x < MAP_WIDTH; x += tileSize) {
+        const color = seededRandom() < 0.6 ? grassColor : dirtColor;
+        
+        // Add slight color variation for visual interest
+        const variation = Math.floor(seededRandom() * 15) - 7;
+        const variedColor = color + (variation << 16) + (variation << 8) + variation;
+        
+        terrainGraphics.fillStyle(variedColor, 1);
+        terrainGraphics.fillRect(x, y, tileSize, tileSize);
+      }
     }
   }
 
@@ -127,10 +138,6 @@ export default class GameScene extends Phaser.Scene {
 
     // Listen for game state updates (30 times per second from server)
     ws.on('game:state', (state: GameState) => {
-      // Log first game state to confirm we're receiving updates
-      if (state.tick === 1) {
-        console.log('🎮 First game state received! Tick:', state.tick, 'Players:', Object.keys(state.players).length);
-      }
       this.lastGameState = state;
       this.currentTick = state.tick;
       this.updateGameState(state);
@@ -138,17 +145,20 @@ export default class GameScene extends Phaser.Scene {
 
     // Handle match end
     ws.on('match_ended', (data: any) => {
-      console.log('� Match ended:', data);
-      // TODO: Show game over screen
-      this.scene.start('GameOverScene', data);
+      // Add local player ID to the data
+      const gameOverData = {
+        ...data,
+        localPlayerId: this.localPlayerId,
+      };
+      
+      // Stop game scene and show game over screen
+      this.scene.start('GameOverScene', gameOverData);
     });
 
     // Handle player death
-    ws.on('player_died', (data: any) => {
-      console.log('💀 Player died:', data);
+    ws.on('player_died', (_data: any) => {
+      // Player death handled in game state update
     });
-
-    console.log('✅ WebSocket handlers registered');
   }
 
   private updateGameState(state: GameState) {
@@ -183,12 +193,9 @@ export default class GameScene extends Phaser.Scene {
   private updatePlayers(players: Record<string, PlayerState>) {
     const playerIds = Object.keys(players);
 
-    console.log('🎮 updatePlayers called with', playerIds.length, 'players. Current tanks:', this.tanks.size);
-
     // Remove tanks that no longer exist
     this.tanks.forEach((tankData, id) => {
       if (!players[id]) {
-        console.log('🗑️ Removing tank for player:', id);
         tankData.tank.destroy();
         this.tanks.delete(id);
       }
@@ -197,21 +204,17 @@ export default class GameScene extends Phaser.Scene {
     // Update or create tanks
     playerIds.forEach(id => {
       const player = players[id];
-      console.log('🔍 Processing player:', id, 'isAlive:', player.isAlive, 'pos:', player.position);
       
       if (!player.isAlive) {
-        console.log('⚰️ Player', id, 'is not alive, skipping');
         return;
       }
 
       let tankData = this.tanks.get(id);
       if (!tankData) {
         const isLocal = id === this.localPlayerId;
-        console.log('🆕 Creating new tank for player:', player.username, 'isLocal:', isLocal, 'at position:', player.position);
         const tank = new Tank(this, player.position.x, player.position.y, player.username, isLocal);
         tankData = { tank };
         this.tanks.set(id, tankData);
-        console.log('✅ Tank created! Total tanks now:', this.tanks.size);
       }
 
       // Update tank position
@@ -220,8 +223,24 @@ export default class GameScene extends Phaser.Scene {
       // Update tank body rotation (movement direction)
       tankData.tank.setBodyRotation(player.rotation);
       
-      // Update turret rotation (aim direction - same as movement for now)
-      tankData.tank.setTurretRotation(player.rotation);
+      // Update turret rotation
+      // For local player: use mouse position (real-time, not synced)
+      // For other players: use their rotation as fallback (server doesn't need to send turret_rotation)
+      if (id === this.localPlayerId) {
+        // Local player - calculate turret angle from mouse position in real-time
+        const pointer = this.input.activePointer;
+        const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+        const turretAngle = Phaser.Math.Angle.Between(
+          player.position.x,
+          player.position.y,
+          worldPoint.x,
+          worldPoint.y
+        );
+        tankData.tank.setTurretRotation(turretAngle);
+      } else {
+        // Other players - just show body rotation (or turret_rotation if server sends it)
+        tankData.tank.setTurretRotation(player.turret_rotation || player.rotation);
+      }
 
       // Update health bar
       tankData.tank.updateHealthBar(player.health, player.maxHealth);
@@ -246,13 +265,17 @@ export default class GameScene extends Phaser.Scene {
         // Determine bullet color based on owner (green = player, red = enemy)
         const bulletKey = proj.ownerId === this.localPlayerId ? 'bullet-green' : 'bullet-red';
         sprite = this.add.sprite(proj.position.x, proj.position.y, bulletKey);
+        sprite.setOrigin(0.5, 0.5); // Center origin for proper rotation
         sprite.setScale(0.8); // Scale down bullets slightly
         this.projectileSprites.set(proj.id, sprite);
       }
 
-      // Update position and rotation
+      // Update position and rotation based on velocity direction
       sprite.setPosition(proj.position.x, proj.position.y);
-      sprite.setRotation(proj.velocity ? Math.atan2(proj.velocity.y, proj.velocity.x) : 0);
+      // Bullet sprite points up by default, so add π/2 to rotate it to point right first
+      // Then atan2 gives us the angle from right (0) going counter-clockwise
+      const bulletRotation = proj.velocity ? Math.atan2(proj.velocity.y, proj.velocity.x) + Math.PI / 2 : 0;
+      sprite.setRotation(bulletRotation);
     });
   }
 
@@ -464,7 +487,25 @@ export default class GameScene extends Phaser.Scene {
   }
 
   shutdown() {
-    // Clean up - WebSocket handlers will be cleaned up automatically
-    console.log('🧹 GameScene shutdown');
+    // Clean up WebSocket handlers to prevent stale callbacks
+    const ws = getWebSocketService();
+    ws.clearHandlers('game:state');
+    ws.clearHandlers('match_ended');
+    ws.clearHandlers('player_died');
+    
+    // Clear sprite maps
+    this.tanks.forEach(tankData => tankData.tank.destroy());
+    this.tanks.clear();
+    
+    this.projectileSprites.forEach(sprite => sprite.destroy());
+    this.projectileSprites.clear();
+    
+    this.lootSprites.forEach(sprite => sprite.destroy());
+    this.lootSprites.clear();
+    
+    this.crateSprites.forEach(sprite => sprite.destroy());
+    this.crateSprites.clear();
+    
+    console.log('🛑 GameScene: Shutdown complete');
   }
 }

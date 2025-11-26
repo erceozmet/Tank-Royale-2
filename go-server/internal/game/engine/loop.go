@@ -24,8 +24,9 @@ type GameLoop struct {
 	historyIndex   int
 	maxHistorySize int
 
-	inputQueue    chan PlayerInput
-	broadcastChan chan GameStateUpdate
+	inputQueue       chan PlayerInput
+	broadcastChan    chan GameStateUpdate
+	playerLastInputs map[string]combat.PlayerInput // Store last input per player for movement
 
 	matchStartTime time.Time
 	tickStartTime  time.Time
@@ -76,6 +77,7 @@ func NewGameLoop(matchID string) *GameLoop {
 		maxHistorySize:    maxSnapshots,
 		inputQueue:        make(chan PlayerInput, 1000),
 		broadcastChan:     make(chan GameStateUpdate, 100),
+		playerLastInputs:  make(map[string]combat.PlayerInput),
 		ctx:               ctx,
 		cancel:            cancel,
 		running:           false,
@@ -181,12 +183,12 @@ func (gl *GameLoop) processInputs() {
 				continue
 			}
 
-			// Handle fire input
+			// Store input for movement processing in updatePhysics
+			gl.playerLastInputs[input.UserID] = input.Input
+
+			// Handle fire input with LAG COMPENSATION (projectile-based)
 			if input.Input.Fire {
-				projectile, err := gl.projectileManager.FireWeapon(player)
-				if err == nil && projectile != nil {
-					player.LastFireTime = time.Now()
-				}
+				gl.handleFireWithLagComp(player, input)
 			}
 
 			// Handle interact input (crate opening)
@@ -194,32 +196,106 @@ func (gl *GameLoop) processInputs() {
 				gl.handleCrateInteraction(player)
 			}
 
-			// Movement will be handled in updatePhysics
-
 		default:
 			return // No more inputs
 		}
 	}
 }
 
+// handleFireWithLagComp spawns a projectile with lag compensation
+// Instead of hitscan, this spawns a real projectile at the shooter's historical position
+// and fast-forwards it to catch up with the current server time
+func (gl *GameLoop) handleFireWithLagComp(player *entities.Player, input PlayerInput) {
+	// Get historical state at client's timestamp
+	pastState := gl.getStateAt(input.Timestamp)
+
+	// Get shooter's past position and rotation (where they were when they fired)
+	pastShooter, exists := pastState.Players[input.UserID]
+	if !exists {
+		// Fallback to current state if not in history
+		pastShooter = player
+	}
+
+	// Spawn projectile at historical position with historical rotation
+	proj, err := gl.projectileManager.FireWeaponWithLagComp(
+		player,
+		input.Timestamp,
+		pastShooter.Position,
+		pastShooter.TurretRotation,
+	)
+
+	if err != nil {
+		return // Couldn't fire (cooldown, etc.)
+	}
+
+	if proj != nil {
+		// Calculate how much time has passed since client fired
+		catchUpDuration := time.Since(input.Timestamp)
+
+		// Cap the catch-up duration to prevent abuse
+		if catchUpDuration > game.LagCompensationBuffer {
+			catchUpDuration = game.LagCompensationBuffer
+		}
+
+		// Fast-forward projectile to catch up with current server time
+		// This simulates the projectile as if it had been fired at the client's timestamp
+		events := gl.projectileManager.SimulateForward(
+			proj,
+			catchUpDuration,
+			gl.state.Players,
+			gl.state.Obstacles,
+		)
+
+		// Process any collision events that occurred during fast-forward
+		for _, event := range events {
+			gl.processCollisionEvent(event)
+		}
+	}
+}
+
+// processCollisionEvent handles collision events from projectiles (kills, stats tracking)
+func (gl *GameLoop) processCollisionEvent(event combat.CollisionEvent) {
+	if event.Type == combat.CollisionTypePlayerHit {
+		// Update shooter's stats
+		if shooter, exists := gl.state.Players[event.ShooterID]; exists {
+			if event.PlayerDied {
+				shooter.Kills++
+				gl.state.UpdatePlayerRanking(event.ShooterID, shooter.Kills, 0, shooter.IsAlive)
+			}
+		}
+
+		// Update victim's stats
+		if victim, exists := gl.state.Players[event.TargetID]; exists {
+			gl.state.UpdatePlayerRanking(event.TargetID, victim.Kills, 0, victim.IsAlive)
+		}
+	}
+
+	if event.Type == combat.CollisionTypeObstacleHit && event.ObstacleDestroyed {
+		// Remove destroyed obstacle
+		for i, obstacle := range gl.state.Obstacles {
+			if obstacle.ID == event.TargetID {
+				gl.state.Obstacles = append(gl.state.Obstacles[:i], gl.state.Obstacles[i+1:]...)
+				break
+			}
+		}
+	}
+}
+
 // updatePhysics updates player movement and physics
 func (gl *GameLoop) updatePhysics() {
-	// Get pending inputs for each player
-	playerInputs := make(map[string]combat.PlayerInput)
-
 	// Process movement for each player
 	for userID, player := range gl.state.Players {
 		if !player.IsAlive {
 			continue
 		}
 
-		// Get input for this player (if any)
-		input, exists := playerInputs[userID]
+		// Get last input for this player (if any)
+		input, exists := gl.playerLastInputs[userID]
 		if !exists {
 			input = combat.PlayerInput{} // Empty input = no movement
 		}
 
-		// Update player movement
+		// Update player movement and rotation
 		gl.physics.UpdatePlayerMovement(player, input, gl.state.Obstacles)
 	}
 
@@ -400,6 +476,7 @@ func (gl *GameLoop) cloneGameState(original *GameState) *GameState {
 			Position:            player.Position,
 			Velocity:            player.Velocity,
 			Rotation:            player.Rotation,
+			TurretRotation:      player.TurretRotation,
 			Health:              player.Health,
 			Shield:              player.Shield,
 			MaxShield:           player.MaxShield,
@@ -457,142 +534,4 @@ func (gl *GameLoop) getStateAt(timestamp time.Time) *GameState {
 	}
 
 	return closestState
-}
-
-// ProcessShootWithLagComp processes a shoot action with lag compensation
-// This rewinds the game state to the client's timestamp and checks hit detection
-func (gl *GameLoop) ProcessShootWithLagComp(userID string, clientTimestamp time.Time, shootDirection entities.Vector2D) bool {
-	gl.mu.Lock()
-	defer gl.mu.Unlock()
-
-	// Get the shooter
-	shooter, exists := gl.state.Players[userID]
-	if !exists || !shooter.IsAlive {
-		return false
-	}
-
-	// Check if player can fire
-	weapon := gl.getWeaponStats(shooter.CurrentWeapon)
-	if !shooter.CanFire(weapon.FireRate) {
-		return false // Too soon to fire again
-	}
-
-	// Get historical state for lag compensation
-	pastState := gl.getStateAt(clientTimestamp)
-
-	// Get shooter position from past state (for accurate hit detection)
-	pastShooter, exists := pastState.Players[userID]
-	if !exists {
-		// Fallback to current state if not in history
-		pastShooter = shooter
-	}
-
-	// Perform raycast in past state to check for hits
-	hitPlayerID := gl.performRaycast(userID, pastShooter.Position, shootDirection, pastState)
-
-	// Apply damage in CURRENT state if hit detected
-	if hitPlayerID != "" {
-		victim, exists := gl.state.Players[hitPlayerID]
-		if exists && victim.IsAlive {
-			// Calculate damage with boosts
-			damage := weapon.Damage
-			damage += shooter.DamageBoostStacks * 5 // +5 damage per boost
-
-			// Apply damage
-			died := victim.TakeDamage(damage)
-
-			if died {
-				shooter.Kills++
-				gl.state.UpdatePlayerRanking(userID, shooter.Kills, 0, shooter.IsAlive)
-				gl.state.UpdatePlayerRanking(hitPlayerID, victim.Kills, 0, false)
-			}
-
-			// Update shooter's last fire time
-			shooter.LastFireTime = time.Now()
-			return true
-		}
-	}
-
-	// No hit, but still update fire time
-	shooter.LastFireTime = time.Now()
-	return false
-}
-
-// performRaycast performs a simple raycast to check if the shot hits any player
-// Returns the userID of the hit player, or empty string if no hit
-func (gl *GameLoop) performRaycast(shooterID string, origin entities.Vector2D, direction entities.Vector2D, state *GameState) string {
-	// Normalize direction
-	dirLength := direction.Magnitude()
-	if dirLength == 0 {
-		return ""
-	}
-	direction = direction.Normalize()
-
-	// Raycast distance (weapon range)
-	maxRange := 800.0 // Default weapon range
-
-	// Check all players for intersection
-	var closestHit string
-	closestDistance := maxRange
-
-	for playerID, player := range state.Players {
-		if !player.IsAlive {
-			continue
-		}
-
-		// Don't hit yourself
-		if playerID == shooterID {
-			continue
-		}
-
-		// Calculate distance from ray to player
-		toPlayer := player.Position.Subtract(origin)
-		projection := toPlayer.Dot(direction)
-
-		// Player is behind the shooter
-		if projection < 0 {
-			continue
-		}
-
-		// Player is beyond max range
-		if projection > maxRange {
-			continue
-		}
-
-		// Calculate perpendicular distance to ray
-		closestPoint := origin.Add(direction.Multiply(projection))
-		distanceToRay := player.Position.Distance(closestPoint)
-
-		// Check if within hit radius (player hitbox)
-		playerRadius := 20.0 // Player hit radius
-		if distanceToRay <= playerRadius && projection < closestDistance {
-			closestDistance = projection
-			closestHit = playerID
-		}
-	}
-
-	return closestHit
-}
-
-// WeaponStats holds weapon statistics
-type WeaponStats struct {
-	Damage   int
-	FireRate time.Duration
-	Range    float64
-}
-
-// getWeaponStats returns the stats for a given weapon type
-func (gl *GameLoop) getWeaponStats(weaponType entities.WeaponType) WeaponStats {
-	switch weaponType {
-	case entities.WeaponPistol:
-		return WeaponStats{Damage: 20, FireRate: 500 * time.Millisecond, Range: 800}
-	case entities.WeaponRifle:
-		return WeaponStats{Damage: 30, FireRate: 300 * time.Millisecond, Range: 1000}
-	case entities.WeaponShotgun:
-		return WeaponStats{Damage: 60, FireRate: 1000 * time.Millisecond, Range: 400}
-	case entities.WeaponSniper:
-		return WeaponStats{Damage: 100, FireRate: 1500 * time.Millisecond, Range: 1500}
-	default:
-		return WeaponStats{Damage: 20, FireRate: 500 * time.Millisecond, Range: 800}
-	}
 }

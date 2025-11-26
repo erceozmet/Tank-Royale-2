@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/erceozmet/tank-royale-2/go-server/internal/auth"
 	"github.com/erceozmet/tank-royale-2/go-server/internal/cache"
@@ -10,6 +12,7 @@ import (
 	"github.com/erceozmet/tank-royale-2/go-server/internal/middleware"
 	"github.com/erceozmet/tank-royale-2/go-server/internal/repositories"
 	"github.com/erceozmet/tank-royale-2/go-server/pkg/logger"
+	"github.com/google/uuid"
 )
 
 // AuthHandler handles authentication endpoints
@@ -286,6 +289,60 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 			"kdr":         stats.KDR,
 			"createdAt":   user.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 			"lastLogin":   user.LastLogin.Format("2006-01-02T15:04:05Z07:00"),
+		},
+	})
+}
+
+// Guest handles POST /api/auth/guest
+// Creates a temporary guest session without database persistence
+func (h *AuthHandler) Guest(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Generate unique guest ID and username
+	guestID := fmt.Sprintf("guest_%s", uuid.New().String()[:8])
+	guestNumber := time.Now().UnixNano() % 10000
+	guestUsername := fmt.Sprintf("Guest_%04d", guestNumber)
+
+	// Generate JWT token for the guest
+	token, err := auth.GenerateToken(guestID, guestUsername)
+	if err != nil {
+		logger.Logger.Error().Err(err).Msg("Failed to generate guest token")
+		http.Error(w, `{"error":"Internal server error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	// Create Redis session (no database entry)
+	sessionData := cache.SessionData{
+		UserID:   guestID,
+		Username: guestUsername,
+		Email:    "", // No email for guests
+		Token:    token,
+		IsGuest:  true,
+	}
+	if err := h.sessionManager.SetSession(ctx, guestID, sessionData); err != nil {
+		logger.Logger.Error().Err(err).Msg("Failed to create guest session")
+		http.Error(w, `{"error":"Internal server error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	// Track successful authentication
+	metrics.AuthAttempts.WithLabelValues("guest").Inc()
+
+	logger.Logger.Info().
+		Str("guestId", guestID).
+		Str("username", guestUsername).
+		Msg("Guest session created")
+
+	// Return response (same format as register/login for client compatibility)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message": "Guest session created",
+		"token":   token,
+		"user": map[string]interface{}{
+			"id":       guestID,
+			"username": guestUsername,
+			"isGuest":  true,
 		},
 	})
 }

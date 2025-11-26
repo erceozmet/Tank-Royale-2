@@ -109,10 +109,13 @@ func (p *Physics) UpdatePlayerMovement(
 		}
 	}
 
-	// Update rotation based on mouse/aim input
-	if input.Rotation != 0 {
-		player.Rotation = input.Rotation
+	// Update body rotation based on movement direction (if moving)
+	if desiredVelocity.Magnitude() > 0 {
+		player.Rotation = desiredVelocity.Angle()
 	}
+
+	// Update turret rotation to aim angle from input
+	player.TurretRotation = input.Rotation
 
 	// Track movement validation duration
 	metrics.MovementValidationDuration.Observe(time.Since(start).Seconds())

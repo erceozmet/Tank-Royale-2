@@ -13,6 +13,10 @@ export const GAME_CONFIG: Phaser.Types.Core.GameConfig = {
   parent: 'phaser-game',
   backgroundColor: '#ffffff', // White background
   
+  // CRITICAL: Disable pause on blur for multiplayer
+  // Without this, game stops updating when tab is hidden
+  disableContextMenu: true,
+  
   physics: {
     default: 'arcade',
     arcade: {
@@ -50,7 +54,7 @@ export const GAME_CONFIG: Phaser.Types.Core.GameConfig = {
   
   fps: {
     target: 60,
-    forceSetTimeOut: false,
+    forceSetTimeOut: true, // CRITICAL: Use setTimeout instead of RAF for background tab support
   },
   
   dom: {

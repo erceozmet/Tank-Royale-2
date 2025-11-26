@@ -31,8 +31,9 @@ export class Tank extends Phaser.GameObjects.Container {
     this.add(this.bodySprite);
 
     // Create turret sprite (will rotate towards aim direction)
+    // Pivot at the back of the turret so barrel extends from tank center toward mouse
     this.turretSprite = scene.add.sprite(0, 0, `tank-turret-${this.tankColor}`);
-    this.turretSprite.setOrigin(0.3, 0.5); // Pivot point closer to tank center
+    this.turretSprite.setOrigin(0.2, 0.5); // Pivot at back of turret (barrel extends right)
     this.add(this.turretSprite);
 
     // Player name above tank

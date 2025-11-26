@@ -14,6 +14,7 @@ export interface PlayerState {
   position: { x: number; y: number };
   velocity: { x: number; y: number };
   rotation: number;
+  turret_rotation: number; // Aim angle for turret
   health: number;
   maxHealth: number;
   speed: number;
@@ -212,6 +213,13 @@ export class WebSocketService {
         handlers.splice(index, 1);
       }
     }
+  }
+
+  /**
+   * Clear all handlers for a message type
+   */
+  clearHandlers(messageType: string): void {
+    this.messageHandlers.delete(messageType);
   }
 
   /**

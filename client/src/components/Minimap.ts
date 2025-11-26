@@ -22,7 +22,7 @@ function initMinimapRendering(canvas: HTMLCanvasElement) {
 
   // Map dimensions (will be updated from game state)
   let mapWidth = 4000;
-  let _mapHeight = 4000; // Prefix with _ to indicate intentionally unused (reserved for future)
+  let mapHeight = 4000;
   let safeZoneRadius = 2000;
   let safeZoneX = 2000;
   let safeZoneY = 2000;
@@ -42,9 +42,9 @@ function initMinimapRendering(canvas: HTMLCanvasElement) {
     ctx.strokeRect(0, 0, canvas.width, canvas.height);
 
     // Draw safe zone circle
-    // Note: Currently using square map (mapWidth === mapHeight)
-    // For future non-square maps, use: const scaleY = canvas.height / mapHeight;
-    const scale = canvas.width / mapWidth;
+    // Currently using square map (mapWidth === mapHeight)
+    // For future non-square maps, adjust scale calculation
+    const scale = canvas.width / Math.max(mapWidth, mapHeight);
     const centerX = (safeZoneX * scale);
     const centerY = (safeZoneY * scale);
     const radius = safeZoneRadius * scale;
@@ -107,7 +107,7 @@ function initMinimapRendering(canvas: HTMLCanvasElement) {
     playerX = data.playerX;
     playerY = data.playerY;
     mapWidth = data.mapWidth;
-    _mapHeight = data.mapHeight; // Match the underscore prefix
+    mapHeight = data.mapHeight;
     safeZoneX = data.safeZoneX;
     safeZoneY = data.safeZoneY;
     safeZoneRadius = data.safeZoneRadius;

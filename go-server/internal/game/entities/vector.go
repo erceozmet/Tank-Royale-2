@@ -46,3 +46,8 @@ func (v Vector2D) Distance(other Vector2D) float64 {
 func (v Vector2D) Dot(other Vector2D) float64 {
 	return v.X*other.X + v.Y*other.Y
 }
+
+// Angle returns the angle of the vector in radians
+func (v Vector2D) Angle() float64 {
+	return math.Atan2(v.Y, v.X)
+}

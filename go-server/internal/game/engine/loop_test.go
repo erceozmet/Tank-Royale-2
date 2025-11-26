@@ -227,107 +227,225 @@ func TestGetStateAtEmptyHistory(t *testing.T) {
 	assert.Equal(t, "test-match", state.MatchID, "Should be the current state")
 }
 
-// TestPerformRaycast verifies hit detection logic
-func TestPerformRaycast(t *testing.T) {
-	gl := &GameLoop{}
+// TestPerformRaycast has been replaced by projectile-based tests
+// The old hitscan raycast system has been removed in favor of projectile-based lag compensation
 
-	// Create test state with two players
-	state := NewGameState("test-match")
+// TestProjectileLagCompensationSpawnsAtHistoricalPosition verifies projectiles spawn at shooter's past position
+func TestProjectileLagCompensationSpawnsAtHistoricalPosition(t *testing.T) {
+	gl := NewGameLoop("test-match")
+	gl.matchStartTime = time.Now()
+
+	// Add shooter at initial position
 	shooter := &entities.Player{
-		ID:       "shooter",
-		Username: "Shooter",
-		Position: entities.Vector2D{X: 0, Y: 0},
-		IsAlive:  true,
-		Health:   100,
+		ID:             "shooter",
+		Username:       "Shooter",
+		Position:       entities.Vector2D{X: 100, Y: 100},
+		TurretRotation: 0, // Aiming right
+		IsAlive:        true,
+		Health:         100,
+		CurrentWeapon:  entities.WeaponRifle,
+		LastFireTime:   time.Now().Add(-2 * time.Second), // Can fire
 	}
+	gl.state.Players["shooter"] = shooter
+
+	// Save snapshot at T0 (shooter at 100, 100)
+	t0 := time.Now()
+	gl.state.Timestamp = t0
+	gl.saveStateSnapshot()
+
+	// Move shooter to new position
+	shooter.Position = entities.Vector2D{X: 300, Y: 300}
+
+	// Save snapshot at T1
+	time.Sleep(35 * time.Millisecond) // One tick
+	gl.state.Timestamp = time.Now()
+	gl.saveStateSnapshot()
+
+	// Queue fire input with T0 timestamp (when shooter was at 100, 100)
+	input := PlayerInput{
+		UserID: "shooter",
+		Tick:   1,
+		Input: combat.PlayerInput{
+			Fire: true,
+		},
+		Timestamp: t0,
+	}
+	gl.inputQueue <- input
+
+	// Process inputs
+	gl.processInputs()
+
+	// Verify projectile was created
+	projectiles := gl.projectileManager.GetProjectiles()
+	require.Len(t, projectiles, 1, "Should have spawned one projectile")
+
+	proj := projectiles[0]
+
+	// Projectile should have spawned near historical position (100, 100), not current (300, 300)
+	// Allow for spawn offset (30 units in front) and some fast-forward movement
+	assert.Less(t, proj.StartPosition.X, 200.0, "Projectile should have spawned near historical X position")
+	assert.Less(t, proj.StartPosition.Y, 200.0, "Projectile should have spawned near historical Y position")
+}
+
+// TestProjectileLagCompensationFastForward verifies projectiles are fast-forwarded
+func TestProjectileLagCompensationFastForward(t *testing.T) {
+	gl := NewGameLoop("test-match")
+	gl.matchStartTime = time.Now()
+
+	shooter := &entities.Player{
+		ID:             "shooter",
+		Username:       "Shooter",
+		Position:       entities.Vector2D{X: 100, Y: 100},
+		TurretRotation: 0, // Aiming right (positive X direction)
+		IsAlive:        true,
+		Health:         100,
+		CurrentWeapon:  entities.WeaponRifle,
+		LastFireTime:   time.Now().Add(-2 * time.Second),
+	}
+	gl.state.Players["shooter"] = shooter
+
+	// Save snapshot
+	pastTime := time.Now().Add(-100 * time.Millisecond) // 100ms ago
+	gl.state.Timestamp = pastTime
+	gl.saveStateSnapshot()
+
+	// Queue fire input with past timestamp
+	input := PlayerInput{
+		UserID: "shooter",
+		Tick:   1,
+		Input: combat.PlayerInput{
+			Fire: true,
+		},
+		Timestamp: pastTime, // Client fired 100ms ago
+	}
+	gl.inputQueue <- input
+
+	// Process inputs
+	gl.processInputs()
+
+	// Get projectile
+	projectiles := gl.projectileManager.GetProjectiles()
+	require.Len(t, projectiles, 1)
+
+	proj := projectiles[0]
+
+	// Projectile should have moved forward from start position due to fast-forward
+	traveledDistance := proj.Position.Distance(proj.StartPosition)
+	assert.Greater(t, traveledDistance, 0.0, "Projectile should have moved due to fast-forward")
+}
+
+// TestProjectileCanBeDodged verifies slow projectiles can be dodged
+func TestProjectileCanBeDodged(t *testing.T) {
+	gl := NewGameLoop("test-match")
+	gl.matchStartTime = time.Now()
+
+	// Shooter at origin, aiming right
+	shooter := &entities.Player{
+		ID:             "shooter",
+		Username:       "Shooter",
+		Position:       entities.Vector2D{X: 100, Y: 500},
+		TurretRotation: 0, // Aiming right
+		IsAlive:        true,
+		Health:         100,
+		CurrentWeapon:  entities.WeaponShotgun, // Slow projectile
+		LastFireTime:   time.Now().Add(-2 * time.Second),
+	}
+
+	// Target 400 units away (at shotgun max range)
 	target := &entities.Player{
 		ID:       "target",
 		Username: "Target",
-		Position: entities.Vector2D{X: 100, Y: 0}, // 100 units to the right
+		Position: entities.Vector2D{X: 500, Y: 500},
 		IsAlive:  true,
 		Health:   100,
 	}
-	state.Players["shooter"] = shooter
-	state.Players["target"] = target
 
-	// Test direct hit
-	direction := entities.Vector2D{X: 1, Y: 0} // Shoot right
-	hitID := gl.performRaycast("shooter", shooter.Position, direction, state)
-	assert.Equal(t, "target", hitID, "Should hit target directly in line of fire")
+	gl.state.Players["shooter"] = shooter
+	gl.state.Players["target"] = target
 
-	// Test miss (shoot in wrong direction)
-	direction = entities.Vector2D{X: 0, Y: 1} // Shoot up
-	hitID = gl.performRaycast("shooter", shooter.Position, direction, state)
-	assert.Empty(t, hitID, "Should miss when shooting in wrong direction")
+	// Save snapshot
+	gl.state.Timestamp = time.Now()
+	gl.saveStateSnapshot()
 
-	// Test self-exclusion
-	direction = entities.Vector2D{X: -1, Y: 0} // Shoot left (through own position)
-	hitID = gl.performRaycast("shooter", shooter.Position, direction, state)
-	assert.NotEqual(t, "shooter", hitID, "Should not hit self")
+	// Fire at target
+	input := PlayerInput{
+		UserID: "shooter",
+		Tick:   1,
+		Input: combat.PlayerInput{
+			Fire: true,
+		},
+		Timestamp: time.Now(),
+	}
+	gl.inputQueue <- input
+	gl.processInputs()
+
+	// Target moves out of the way immediately (before projectile arrives)
+	target.Position.Y = 700 // Move up significantly
+
+	// Run multiple ticks to let projectile travel
+	for i := 0; i < 50; i++ {
+		gl.tick()
+	}
+
+	// Target should still be alive (dodged the projectile)
+	assert.True(t, target.IsAlive, "Target should have dodged the slow projectile")
+	assert.Equal(t, 100, target.Health, "Target health should be unchanged")
 }
 
-// TestPerformRaycastDeadPlayer verifies dead players are not hit
-func TestPerformRaycastDeadPlayer(t *testing.T) {
-	gl := &GameLoop{}
+// TestProjectileHitsStationaryTarget verifies projectiles hit targets that don't move
+func TestProjectileHitsStationaryTarget(t *testing.T) {
+	gl := NewGameLoop("test-match")
+	gl.matchStartTime = time.Now()
 
-	state := NewGameState("test-match")
+	// Shooter at origin, aiming right
 	shooter := &entities.Player{
-		ID:       "shooter",
-		Username: "Shooter",
-		Position: entities.Vector2D{X: 0, Y: 0},
+		ID:             "shooter",
+		Username:       "Shooter",
+		Position:       entities.Vector2D{X: 100, Y: 500},
+		TurretRotation: 0, // Aiming right
+		IsAlive:        true,
+		Health:         100,
+		CurrentWeapon:  entities.WeaponRifle, // Fast projectile
+		LastFireTime:   time.Now().Add(-2 * time.Second),
+	}
+
+	// Target directly in line of fire
+	target := &entities.Player{
+		ID:       "target",
+		Username: "Target",
+		Position: entities.Vector2D{X: 300, Y: 500}, // 200 units away, directly right
 		IsAlive:  true,
 		Health:   100,
 	}
-	deadTarget := &entities.Player{
-		ID:       "dead",
-		Username: "DeadPlayer",
-		Position: entities.Vector2D{X: 100, Y: 0},
-		IsAlive:  false, // Dead
-		Health:   0,
-	}
-	state.Players["shooter"] = shooter
-	state.Players["dead"] = deadTarget
 
-	// Shoot at dead player
-	direction := entities.Vector2D{X: 1, Y: 0}
-	hitID := gl.performRaycast("shooter", shooter.Position, direction, state)
-	assert.Empty(t, hitID, "Should not hit dead players")
-}
+	gl.state.Players["shooter"] = shooter
+	gl.state.Players["target"] = target
 
-// TestPerformRaycastClosestTarget verifies closest target is hit when multiple in line
-func TestPerformRaycastClosestTarget(t *testing.T) {
-	gl := &GameLoop{}
+	gl.state.Timestamp = time.Now()
+	gl.saveStateSnapshot()
 
-	state := NewGameState("test-match")
-	shooter := &entities.Player{
-		ID:       "shooter",
-		Username: "Shooter",
-		Position: entities.Vector2D{X: 0, Y: 0},
-		IsAlive:  true,
-		Health:   100,
+	// Fire at target
+	input := PlayerInput{
+		UserID: "shooter",
+		Tick:   1,
+		Input: combat.PlayerInput{
+			Fire: true,
+		},
+		Timestamp: time.Now(),
 	}
-	nearTarget := &entities.Player{
-		ID:       "near",
-		Username: "NearTarget",
-		Position: entities.Vector2D{X: 50, Y: 0}, // Closer
-		IsAlive:  true,
-		Health:   100,
-	}
-	farTarget := &entities.Player{
-		ID:       "far",
-		Username: "FarTarget",
-		Position: entities.Vector2D{X: 100, Y: 0}, // Farther
-		IsAlive:  true,
-		Health:   100,
-	}
-	state.Players["shooter"] = shooter
-	state.Players["near"] = nearTarget
-	state.Players["far"] = farTarget
+	gl.inputQueue <- input
+	gl.processInputs()
 
-	// Shoot through both targets
-	direction := entities.Vector2D{X: 1, Y: 0}
-	hitID := gl.performRaycast("shooter", shooter.Position, direction, state)
-	assert.Equal(t, "near", hitID, "Should hit nearest target in line of fire")
+	// Run ticks until projectile hits or expires
+	for i := 0; i < 100; i++ {
+		if target.Health < 100 {
+			break
+		}
+		gl.tick()
+	}
+
+	// Target should have taken damage
+	assert.Less(t, target.Health, 100, "Target should have been hit by projectile")
 }
 
 // TestSaveStateSnapshotMemoryManagement verifies no memory leaks
@@ -653,13 +771,14 @@ func TestProcessShootWithLagCompIntegration(t *testing.T) {
 
 	// Add shooter and target
 	shooter := &entities.Player{
-		ID:            "shooter",
-		Username:      "Shooter",
-		Position:      entities.Vector2D{X: 0, Y: 0},
-		IsAlive:       true,
-		Health:        100,
-		CurrentWeapon: entities.WeaponRifle,
-		LastFireTime:  time.Now().Add(-1 * time.Second), // Can fire
+		ID:             "shooter",
+		Username:       "Shooter",
+		Position:       entities.Vector2D{X: 0, Y: 0},
+		TurretRotation: 0, // Aiming right
+		IsAlive:        true,
+		Health:         100,
+		CurrentWeapon:  entities.WeaponRifle,
+		LastFireTime:   time.Now().Add(-1 * time.Second), // Can fire
 	}
 
 	target := &entities.Player{
@@ -677,37 +796,52 @@ func TestProcessShootWithLagCompIntegration(t *testing.T) {
 	gl.state.Timestamp = time.Now()
 	gl.saveStateSnapshot()
 
-	// Shoot at target
-	direction := entities.Vector2D{X: 1, Y: 0}
-	clientTimestamp := time.Now()
+	// Queue fire input
+	input := PlayerInput{
+		UserID: "shooter",
+		Tick:   1,
+		Input: combat.PlayerInput{
+			Fire: true,
+		},
+		Timestamp: time.Now(),
+	}
+	gl.inputQueue <- input
 
-	hit := gl.ProcessShootWithLagComp("shooter", clientTimestamp, direction)
+	// Process the input (spawns projectile)
+	gl.processInputs()
 
-	// Should register a hit
-	assert.True(t, hit, "Should hit the target")
+	// Run ticks until projectile hits
+	for i := 0; i < 50; i++ {
+		if target.Health < 100 {
+			break
+		}
+		gl.tick()
+	}
 
 	// Target should have taken damage
 	assert.Less(t, target.Health, 100, "Target should have taken damage")
 }
 
-// TestProcessShootWithLagCompMiss verifies missing a shot
-func TestProcessShootWithLagCompMiss(t *testing.T) {
+// TestProjectileMiss verifies missing a shot with projectile
+func TestProjectileMiss(t *testing.T) {
 	gl := NewGameLoop("test-match")
+	gl.matchStartTime = time.Now()
 
 	shooter := &entities.Player{
-		ID:            "shooter",
-		Username:      "Shooter",
-		Position:      entities.Vector2D{X: 0, Y: 0},
-		IsAlive:       true,
-		Health:        100,
-		CurrentWeapon: entities.WeaponPistol,
-		LastFireTime:  time.Now().Add(-1 * time.Second),
+		ID:             "shooter",
+		Username:       "Shooter",
+		Position:       entities.Vector2D{X: 500, Y: 500}, // Center of map to avoid safe zone
+		TurretRotation: 0,                                  // Aiming right
+		IsAlive:        true,
+		Health:         100,
+		CurrentWeapon:  entities.WeaponPistol,
+		LastFireTime:   time.Now().Add(-1 * time.Second),
 	}
 
 	target := &entities.Player{
 		ID:       "target",
 		Username: "Target",
-		Position: entities.Vector2D{X: 100, Y: 100}, // Not in line of fire
+		Position: entities.Vector2D{X: 500, Y: 700}, // 200 units up (not in line of fire)
 		IsAlive:  true,
 		Health:   100,
 	}
@@ -717,29 +851,41 @@ func TestProcessShootWithLagCompMiss(t *testing.T) {
 	gl.state.Timestamp = time.Now()
 	gl.saveStateSnapshot()
 
-	// Shoot straight right (target is diagonal)
-	direction := entities.Vector2D{X: 1, Y: 0}
-	clientTimestamp := time.Now()
+	// Queue fire input (shooting straight right, target is above)
+	input := PlayerInput{
+		UserID: "shooter",
+		Tick:   1,
+		Input: combat.PlayerInput{
+			Fire: true,
+		},
+		Timestamp: time.Now(),
+	}
+	gl.inputQueue <- input
+	gl.processInputs()
 
-	hit := gl.ProcessShootWithLagComp("shooter", clientTimestamp, direction)
+	// Run until projectile exceeds range
+	for i := 0; i < 100; i++ {
+		gl.tick()
+	}
 
-	// Should miss
-	assert.False(t, hit, "Should miss the target")
+	// Should miss - target health unchanged
 	assert.Equal(t, 100, target.Health, "Target health should be unchanged")
 }
 
-// TestProcessShootWithLagCompNoHistory verifies behavior with no history
-func TestProcessShootWithLagCompNoHistory(t *testing.T) {
+// TestProjectileNoHistoryFallback verifies behavior with no history (uses current state)
+func TestProjectileNoHistoryFallback(t *testing.T) {
 	gl := NewGameLoop("test-match")
+	gl.matchStartTime = time.Now()
 
 	shooter := &entities.Player{
-		ID:            "shooter",
-		Username:      "Shooter",
-		Position:      entities.Vector2D{X: 0, Y: 0},
-		IsAlive:       true,
-		Health:        100,
-		CurrentWeapon: entities.WeaponRifle,
-		LastFireTime:  time.Now().Add(-1 * time.Second),
+		ID:             "shooter",
+		Username:       "Shooter",
+		Position:       entities.Vector2D{X: 0, Y: 0},
+		TurretRotation: 0, // Aiming right
+		IsAlive:        true,
+		Health:         100,
+		CurrentWeapon:  entities.WeaponRifle,
+		LastFireTime:   time.Now().Add(-1 * time.Second),
 	}
 
 	target := &entities.Player{
@@ -753,60 +899,110 @@ func TestProcessShootWithLagCompNoHistory(t *testing.T) {
 	gl.state.Players["shooter"] = shooter
 	gl.state.Players["target"] = target
 
-	// No snapshots saved - should use current state
-	direction := entities.Vector2D{X: 1, Y: 0}
-	clientTimestamp := time.Now()
+	// No snapshots saved - should use current state for spawn
+	input := PlayerInput{
+		UserID: "shooter",
+		Tick:   1,
+		Input: combat.PlayerInput{
+			Fire: true,
+		},
+		Timestamp: time.Now(),
+	}
+	gl.inputQueue <- input
+	gl.processInputs()
 
-	hit := gl.ProcessShootWithLagComp("shooter", clientTimestamp, direction)
-
-	// Should still work with current state
-	assert.True(t, hit, "Should hit using current state as fallback")
-	assert.Less(t, target.Health, 100, "Target should have taken damage")
+	// Verify projectile was created
+	projectiles := gl.projectileManager.GetProjectiles()
+	assert.Len(t, projectiles, 1, "Should have spawned projectile using current state as fallback")
 }
 
-// TestGetWeaponStats verifies weapon stats retrieval
-func TestGetWeaponStats(t *testing.T) {
-	gl := &GameLoop{}
+// TestProjectileExceedsRange verifies projectiles despawn after exceeding max range
+func TestProjectileExceedsRange(t *testing.T) {
+	gl := NewGameLoop("test-match")
+	gl.matchStartTime = time.Now()
+
+	shooter := &entities.Player{
+		ID:             "shooter",
+		Username:       "Shooter",
+		Position:       entities.Vector2D{X: 0, Y: 0},
+		TurretRotation: 0, // Aiming right
+		IsAlive:        true,
+		Health:         100,
+		CurrentWeapon:  entities.WeaponShotgun, // Short range (400)
+		LastFireTime:   time.Now().Add(-1 * time.Second),
+	}
+
+	gl.state.Players["shooter"] = shooter
+	gl.state.Timestamp = time.Now()
+	gl.saveStateSnapshot()
+
+	// Fire projectile
+	input := PlayerInput{
+		UserID: "shooter",
+		Tick:   1,
+		Input: combat.PlayerInput{
+			Fire: true,
+		},
+		Timestamp: time.Now(),
+	}
+	gl.inputQueue <- input
+	gl.processInputs()
+
+	// Verify projectile was created
+	assert.Len(t, gl.projectileManager.GetProjectiles(), 1)
+
+	// Run many ticks until projectile should exceed range and despawn
+	for i := 0; i < 200; i++ {
+		gl.tick()
+	}
+
+	// Projectile should be gone (exceeded range)
+	assert.Len(t, gl.projectileManager.GetProjectiles(), 0, "Projectile should despawn after exceeding range")
+}
+
+// TestWeaponDamageValues verifies weapon damage values are correct
+func TestWeaponDamageValues(t *testing.T) {
+	// Test that CalculateWeaponDamage returns correct base damage values
+	// These match the BaseDamage in game.WeaponStatsMap
 
 	tests := []struct {
 		weapon         entities.WeaponType
 		expectedDamage int
-		expectedRange  float64
 	}{
-		{entities.WeaponPistol, 20, 800.0},
-		{entities.WeaponRifle, 30, 1000.0},
-		{entities.WeaponShotgun, 60, 400.0},
-		{entities.WeaponSniper, 100, 1500.0},
+		{entities.WeaponPistol, 15},
+		{entities.WeaponRifle, 20},
+		{entities.WeaponShotgun, 35},
+		{entities.WeaponSniper, 50},
 	}
 
 	for _, tt := range tests {
 		t.Run(string(tt.weapon), func(t *testing.T) {
-			stats := gl.getWeaponStats(tt.weapon)
-			assert.Equal(t, tt.expectedDamage, stats.Damage)
-			assert.Equal(t, tt.expectedRange, stats.Range)
+			damage := game.CalculateWeaponDamage(tt.weapon, 0) // No damage boost stacks
+			assert.Equal(t, tt.expectedDamage, damage)
 		})
 	}
 }
 
-// TestGetWeaponStatsWithBoosts verifies damage calculation uses game.CalculateWeaponDamage
-func TestGetWeaponStatsWithBoosts(t *testing.T) {
-	// Weapon stats are base stats from getWeaponStats
-	// Boosts are applied separately via game.CalculateWeaponDamage
-	// This test just verifies getWeaponStats returns expected base values
+// TestWeaponSpeedAndRange verifies projectile speed and range values from WeaponStatsMap
+func TestWeaponSpeedAndRange(t *testing.T) {
+	tests := []struct {
+		weapon        entities.WeaponType
+		expectedSpeed float64
+		expectedRange float64
+	}{
+		{entities.WeaponPistol, 10.0, 600.0},
+		{entities.WeaponRifle, 12.0, 800.0},
+		{entities.WeaponShotgun, 8.0, 400.0},
+		{entities.WeaponSniper, 15.0, 1200.0},
+	}
 
-	gl := &GameLoop{}
-
-	pistolStats := gl.getWeaponStats(entities.WeaponPistol)
-	assert.Equal(t, 20, pistolStats.Damage)
-
-	rifleStats := gl.getWeaponStats(entities.WeaponRifle)
-	assert.Equal(t, 30, rifleStats.Damage)
-
-	shotgunStats := gl.getWeaponStats(entities.WeaponShotgun)
-	assert.Equal(t, 60, shotgunStats.Damage)
-
-	sniperStats := gl.getWeaponStats(entities.WeaponSniper)
-	assert.Equal(t, 100, sniperStats.Damage)
+	for _, tt := range tests {
+		t.Run(string(tt.weapon), func(t *testing.T) {
+			stats := game.WeaponStatsMap[tt.weapon]
+			assert.Equal(t, tt.expectedSpeed, stats.Speed, "Unexpected speed for %s", tt.weapon)
+			assert.Equal(t, tt.expectedRange, stats.Range, "Unexpected range for %s", tt.weapon)
+		})
+	}
 }
 
 // ===== Concurrency Safety Tests =====
@@ -1346,3 +1542,410 @@ func TestStateSnapshotPreservesPlayerData(t *testing.T) {
 	assert.Equal(t, player.FireRateBoostStacks, snapshotPlayer.FireRateBoostStacks)
 	assert.Equal(t, player.Kills, snapshotPlayer.Kills)
 }
+
+// ===== Player Input Storage Tests (Movement Bug Fix) =====
+
+// TestPlayerLastInputsInitialized verifies playerLastInputs map is initialized
+func TestPlayerLastInputsInitialized(t *testing.T) {
+	gl := NewGameLoop("test-match")
+	require.NotNil(t, gl.playerLastInputs, "playerLastInputs should be initialized")
+}
+
+// TestProcessInputsStoresMovementInput verifies movement inputs are stored
+func TestProcessInputsStoresMovementInput(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	player := &entities.Player{
+		ID:            "player1", 
+		Username:      "TestPlayer",
+		Position:      entities.Vector2D{X: 100, Y: 100},
+		IsAlive:       true,
+		Health:        100,
+		CurrentWeapon: entities.WeaponPistol,
+	}
+	gl.state.Players["player1"] = player
+
+	// Queue movement input
+	input := PlayerInput{
+		UserID: "player1",
+		Tick:   1,
+		Input: combat.PlayerInput{
+			MoveForward: true,
+			MoveLeft:    true,
+			Rotation:    1.57, // ~90 degrees
+		},
+		Timestamp: time.Now(),
+	}
+	gl.inputQueue <- input
+
+	// Process inputs
+	gl.processInputs()
+
+	// Verify input was stored
+	storedInput, exists := gl.playerLastInputs["player1"]
+	require.True(t, exists, "Input should be stored in playerLastInputs")
+	assert.True(t, storedInput.MoveForward, "MoveForward should be stored")
+	assert.True(t, storedInput.MoveLeft, "MoveLeft should be stored")
+	assert.InDelta(t, 1.57, storedInput.Rotation, 0.01, "Rotation should be stored")
+}
+
+// TestProcessInputsStoresAllDirections verifies all movement directions are stored
+func TestProcessInputsStoresAllDirections(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	player := &entities.Player{
+		ID:       "player1",
+		Username: "TestPlayer",
+		IsAlive:  true,
+		Health:   100,
+	}
+	gl.state.Players["player1"] = player
+
+	// Queue input with all directions
+	input := PlayerInput{
+		UserID: "player1",
+		Tick:   1,
+		Input: combat.PlayerInput{
+			MoveForward:  true,
+			MoveBackward: true,
+			MoveLeft:     true,
+			MoveRight:    true,
+		},
+		Timestamp: time.Now(),
+	}
+	gl.inputQueue <- input
+
+	gl.processInputs()
+
+	storedInput := gl.playerLastInputs["player1"]
+	assert.True(t, storedInput.MoveForward)
+	assert.True(t, storedInput.MoveBackward)
+	assert.True(t, storedInput.MoveLeft)
+	assert.True(t, storedInput.MoveRight)
+}
+
+// TestUpdatePhysicsUsesStoredInputs verifies updatePhysics uses stored inputs
+func TestUpdatePhysicsUsesStoredInputs(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	player := &entities.Player{
+		ID:       "player1",
+		Username: "TestPlayer",
+		Position: entities.Vector2D{X: 500, Y: 500}, // Center of map to avoid boundaries
+		IsAlive:  true,
+		Health:   100,
+	}
+	gl.state.Players["player1"] = player
+
+	// Store movement input directly (simulating processInputs)
+	gl.playerLastInputs["player1"] = combat.PlayerInput{
+		MoveForward: true, // Move up (negative Y)
+	}
+
+	initialY := player.Position.Y
+
+	// Run updatePhysics
+	gl.updatePhysics()
+
+	// Player should have moved (Y should decrease for forward movement)
+	assert.Less(t, player.Position.Y, initialY, "Player should have moved forward (Y decreased)")
+}
+
+// TestUpdatePhysicsMovementAllDirections verifies movement in all directions
+func TestUpdatePhysicsMovementAllDirections(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     combat.PlayerInput
+		expectX   string // "increase", "decrease", "same"
+		expectY   string
+	}{
+		{"MoveForward", combat.PlayerInput{MoveForward: true}, "same", "decrease"},
+		{"MoveBackward", combat.PlayerInput{MoveBackward: true}, "same", "increase"},
+		{"MoveLeft", combat.PlayerInput{MoveLeft: true}, "decrease", "same"},
+		{"MoveRight", combat.PlayerInput{MoveRight: true}, "increase", "same"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gl := NewGameLoop("test-match")
+
+			player := &entities.Player{
+				ID:       "player1",
+				Username: "TestPlayer",
+				Position: entities.Vector2D{X: 500, Y: 500},
+				IsAlive:  true,
+				Health:   100,
+			}
+			gl.state.Players["player1"] = player
+			gl.playerLastInputs["player1"] = tt.input
+
+			initialX := player.Position.X
+			initialY := player.Position.Y
+
+			gl.updatePhysics()
+
+			switch tt.expectX {
+			case "increase":
+				assert.Greater(t, player.Position.X, initialX)
+			case "decrease":
+				assert.Less(t, player.Position.X, initialX)
+			case "same":
+				assert.InDelta(t, initialX, player.Position.X, 0.1)
+			}
+
+			switch tt.expectY {
+			case "increase":
+				assert.Greater(t, player.Position.Y, initialY)
+			case "decrease":
+				assert.Less(t, player.Position.Y, initialY)
+			case "same":
+				assert.InDelta(t, initialY, player.Position.Y, 0.1)
+			}
+		})
+	}
+}
+
+// TestUpdatePhysicsNoInputNoMovement verifies no movement without input
+func TestUpdatePhysicsNoInputNoMovement(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	player := &entities.Player{
+		ID:       "player1",
+		Username: "TestPlayer",
+		Position: entities.Vector2D{X: 500, Y: 500},
+		IsAlive:  true,
+		Health:   100,
+	}
+	gl.state.Players["player1"] = player
+
+	// No input stored for player
+	initialX := player.Position.X
+	initialY := player.Position.Y
+
+	gl.updatePhysics()
+
+	// Position should not change
+	assert.InDelta(t, initialX, player.Position.X, 0.1)
+	assert.InDelta(t, initialY, player.Position.Y, 0.1)
+}
+
+// TestMultiplePlayersMovementIndependent verifies players move independently
+func TestMultiplePlayersMovementIndependent(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	player1 := &entities.Player{
+		ID:       "player1",
+		Username: "P1",
+		Position: entities.Vector2D{X: 300, Y: 300},
+		IsAlive:  true,
+		Health:   100,
+	}
+	player2 := &entities.Player{
+		ID:       "player2",
+		Username: "P2",
+		Position: entities.Vector2D{X: 700, Y: 700},
+		IsAlive:  true,
+		Health:   100,
+	}
+
+	gl.state.Players["player1"] = player1
+	gl.state.Players["player2"] = player2
+
+	// Different inputs for each player
+	gl.playerLastInputs["player1"] = combat.PlayerInput{MoveForward: true}
+	gl.playerLastInputs["player2"] = combat.PlayerInput{MoveRight: true}
+
+	p1InitialY := player1.Position.Y
+	p2InitialX := player2.Position.X
+
+	gl.updatePhysics()
+
+	// Player 1 should move forward (Y decreases)
+	assert.Less(t, player1.Position.Y, p1InitialY)
+
+	// Player 2 should move right (X increases)
+	assert.Greater(t, player2.Position.X, p2InitialX)
+}
+
+// TestInputOverwriteOnNewInput verifies new inputs overwrite old inputs
+func TestInputOverwriteOnNewInput(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	player := &entities.Player{
+		ID:       "player1",
+		Username: "TestPlayer",
+		IsAlive:  true,
+		Health:   100,
+	}
+	gl.state.Players["player1"] = player
+
+	// First input
+	input1 := PlayerInput{
+		UserID: "player1",
+		Tick:   1,
+		Input: combat.PlayerInput{
+			MoveForward: true,
+			Rotation:    1.0,
+		},
+		Timestamp: time.Now(),
+	}
+	gl.inputQueue <- input1
+	gl.processInputs()
+
+	// Verify first input stored
+	assert.True(t, gl.playerLastInputs["player1"].MoveForward)
+	assert.InDelta(t, 1.0, gl.playerLastInputs["player1"].Rotation, 0.01)
+
+	// Second input (different direction)
+	input2 := PlayerInput{
+		UserID: "player1",
+		Tick:   2,
+		Input: combat.PlayerInput{
+			MoveBackward: true,
+			Rotation:     2.0,
+		},
+		Timestamp: time.Now(),
+	}
+	gl.inputQueue <- input2
+	gl.processInputs()
+
+	// Verify second input overwrote first
+	assert.False(t, gl.playerLastInputs["player1"].MoveForward)
+	assert.True(t, gl.playerLastInputs["player1"].MoveBackward)
+	assert.InDelta(t, 2.0, gl.playerLastInputs["player1"].Rotation, 0.01)
+}
+
+// TestDeadPlayerInputNotStored verifies dead player inputs are ignored
+func TestDeadPlayerInputNotStored(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	player := &entities.Player{
+		ID:       "player1",
+		Username: "TestPlayer",
+		IsAlive:  false, // Dead
+		Health:   0,
+	}
+	gl.state.Players["player1"] = player
+
+	input := PlayerInput{
+		UserID: "player1",
+		Tick:   1,
+		Input: combat.PlayerInput{
+			MoveForward: true,
+		},
+		Timestamp: time.Now(),
+	}
+	gl.inputQueue <- input
+	gl.processInputs()
+
+	// Dead player input should not be stored
+	_, exists := gl.playerLastInputs["player1"]
+	assert.False(t, exists, "Dead player input should not be stored")
+}
+
+// TestNonExistentPlayerInputNotStored verifies non-existent player inputs are ignored
+func TestNonExistentPlayerInputNotStored(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	input := PlayerInput{
+		UserID: "nonexistent",
+		Tick:   1,
+		Input: combat.PlayerInput{
+			MoveForward: true,
+		},
+		Timestamp: time.Now(),
+	}
+	gl.inputQueue <- input
+	gl.processInputs()
+
+	// Non-existent player input should not be stored
+	_, exists := gl.playerLastInputs["nonexistent"]
+	assert.False(t, exists, "Non-existent player input should not be stored")
+}
+
+// TestFullTickWithMovement verifies movement works in full tick cycle
+func TestFullTickWithMovement(t *testing.T) {
+	gl := NewGameLoop("test-match")
+	gl.matchStartTime = time.Now()
+
+	player := &entities.Player{
+		ID:            "player1",
+		Username:      "TestPlayer",
+		Position:      entities.Vector2D{X: 500, Y: 500},
+		IsAlive:       true,
+		Health:        100,
+		CurrentWeapon: entities.WeaponPistol,
+	}
+	gl.AddPlayer(player)
+
+	// Queue movement input
+	input := PlayerInput{
+		UserID: "player1",
+		Tick:   1,
+		Input: combat.PlayerInput{
+			MoveForward: true,
+			MoveRight:   true,
+		},
+		Timestamp: time.Now(),
+	}
+	gl.inputQueue <- input
+
+	initialX := player.Position.X
+	initialY := player.Position.Y
+
+	// Run full tick
+	gl.tick()
+
+	// Player should have moved diagonally
+	assert.Greater(t, player.Position.X, initialX, "X should increase (moving right)")
+	assert.Less(t, player.Position.Y, initialY, "Y should decrease (moving forward)")
+}
+
+// TestConcurrentInputProcessing verifies thread safety of input processing
+func TestConcurrentInputProcessing(t *testing.T) {
+	gl := NewGameLoop("test-match")
+
+	// Add multiple players
+	for i := 0; i < 10; i++ {
+		player := &entities.Player{
+			ID:       "player" + string(rune('0'+i)),
+			Username: "P" + string(rune('0'+i)),
+			Position: entities.Vector2D{X: float64(100 + i*100), Y: 500},
+			IsAlive:  true,
+			Health:   100,
+		}
+		gl.state.Players[player.ID] = player
+	}
+
+	var wg sync.WaitGroup
+
+	// Queue inputs concurrently
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			for j := 0; j < 10; j++ {
+				input := PlayerInput{
+					UserID: "player" + string(rune('0'+id)),
+					Tick:   int64(j),
+					Input: combat.PlayerInput{
+						MoveForward: true,
+					},
+					Timestamp: time.Now(),
+				}
+				gl.QueueInput(input)
+			}
+		}(i)
+	}
+
+	wg.Wait()
+
+	// Process all queued inputs
+	gl.processInputs()
+
+	// Should not panic and inputs should be stored
+	assert.NotPanics(t, func() {
+		gl.updatePhysics()
+	})
+}
+
