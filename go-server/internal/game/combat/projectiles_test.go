@@ -68,7 +68,7 @@ func TestFireWeaponWithLagComp(t *testing.T) {
 
 	clientTime := time.Now().Add(-100 * time.Millisecond)
 	historicalPosition := entities.Vector2D{X: 80, Y: 80} // Player was at different position
-	historicalRotation := 0.0                              // Facing right
+	historicalRotation := 0.0                             // Facing right
 
 	proj, err := pm.FireWeaponWithLagComp(player, clientTime, historicalPosition, historicalRotation)
 	require.NoError(t, err)

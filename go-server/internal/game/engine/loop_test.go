@@ -831,7 +831,7 @@ func TestProjectileMiss(t *testing.T) {
 		ID:             "shooter",
 		Username:       "Shooter",
 		Position:       entities.Vector2D{X: 500, Y: 500}, // Center of map to avoid safe zone
-		TurretRotation: 0,                                  // Aiming right
+		TurretRotation: 0,                                 // Aiming right
 		IsAlive:        true,
 		Health:         100,
 		CurrentWeapon:  entities.WeaponPistol,
@@ -1556,7 +1556,7 @@ func TestProcessInputsStoresMovementInput(t *testing.T) {
 	gl := NewGameLoop("test-match")
 
 	player := &entities.Player{
-		ID:            "player1", 
+		ID:            "player1",
 		Username:      "TestPlayer",
 		Position:      entities.Vector2D{X: 100, Y: 100},
 		IsAlive:       true,
@@ -1654,10 +1654,10 @@ func TestUpdatePhysicsUsesStoredInputs(t *testing.T) {
 // TestUpdatePhysicsMovementAllDirections verifies movement in all directions
 func TestUpdatePhysicsMovementAllDirections(t *testing.T) {
 	tests := []struct {
-		name      string
-		input     combat.PlayerInput
-		expectX   string // "increase", "decrease", "same"
-		expectY   string
+		name    string
+		input   combat.PlayerInput
+		expectX string // "increase", "decrease", "same"
+		expectY string
 	}{
 		{"MoveForward", combat.PlayerInput{MoveForward: true}, "same", "decrease"},
 		{"MoveBackward", combat.PlayerInput{MoveBackward: true}, "same", "increase"},
@@ -1948,4 +1948,3 @@ func TestConcurrentInputProcessing(t *testing.T) {
 		gl.updatePhysics()
 	})
 }
-

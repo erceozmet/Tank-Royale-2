@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"strings"
 	"sync"
 	"time"
 
@@ -252,24 +253,72 @@ func (m *Match) endMatch() {
 	})
 }
 
-// saveResults saves match results to PostgreSQL
+// saveResults saves match results to PostgreSQL and broadcasts match_ended
 func (m *Match) saveResults() {
 	ctx := context.Background()
 	state := m.GameLoop.GetState()
 
-	// Check if database is available
+	// Calculate duration
+	duration := 0
+	if m.EndTime != nil {
+		duration = int(m.EndTime.Sub(m.StartTime).Seconds())
+	}
+
+	// Get rankings - this is needed for broadcasting regardless of database
+	rankings := state.GetFinalRankings()
+
+	// Prepare results for broadcasting (even if we can't save to DB)
+	playerResults := make([]map[string]interface{}, 0, len(rankings))
+
+	for _, ranking := range rankings {
+		// Calculate MMR change based on placement
+		mmrChange := calculateMMRChange(ranking.Placement, len(rankings))
+
+		// Add to results for broadcasting
+		playerResults = append(playerResults, map[string]interface{}{
+			"user_id":       ranking.UserID,
+			"username":      ranking.Username,
+			"placement":     ranking.Placement,
+			"kills":         ranking.Kills,
+			"damage_dealt":  ranking.DamageDealt,
+			"survival_time": duration,
+			"mmr_change":    mmrChange,
+		})
+	}
+
+	// Determine winner
+	winnerId := ""
+	if len(rankings) > 0 {
+		winnerId = rankings[0].UserID
+	}
+
+	// ALWAYS broadcast match ended event to all players
+	// This must happen even if database operations fail
+	m.eventChan <- MatchEvent{
+		Type: "match_ended",
+		Data: map[string]interface{}{
+			"match_id":  m.ID,
+			"duration":  duration,
+			"rankings":  playerResults,
+			"winner_id": winnerId,
+		},
+	}
+
+	fmt.Printf("Match %s ended event broadcasted with %d player results\n", m.ID, len(playerResults))
+
+	// Now try to save to database (best effort, don't block match ending)
 	if m.pgDB == nil {
-		fmt.Printf("Error: database not initialized\n")
+		fmt.Printf("Database not initialized, skipping result persistence for match %s\n", m.ID)
+		return
+	}
+
+	if len(rankings) == 0 {
+		fmt.Printf("No rankings to save for match %s\n", m.ID)
 		return
 	}
 
 	// Create match record
 	matchRepo := repositories.NewMatchRepository(m.pgDB)
-
-	duration := 0
-	if m.EndTime != nil {
-		duration = int(m.EndTime.Sub(m.StartTime).Seconds())
-	}
 
 	matchID, err := matchRepo.Create(ctx, repositories.CreateMatchParams{
 		MapName:     "procedural",
@@ -280,24 +329,19 @@ func (m *Match) saveResults() {
 	})
 
 	if err != nil {
-		fmt.Printf("Error saving match: %v\n", err)
+		fmt.Printf("Error saving match to database: %v\n", err)
 		return
 	}
 
-	// Save player results
-	rankings := state.GetFinalRankings()
-
-	// Check if there are any rankings
-	if len(rankings) == 0 {
-		fmt.Printf("No rankings to save for match %s\n", m.ID)
-		return
-	}
-
-	// Prepare results for broadcasting
-	playerResults := make([]map[string]interface{}, 0, len(rankings))
-
+	// Save player results (skip guest users)
 	for _, ranking := range rankings {
-		// Calculate MMR change based on placement
+		// Skip guest users - they don't have database records
+		if strings.HasPrefix(ranking.UserID, "guest_") {
+			fmt.Printf("Skipping database save for guest user: %s\n", ranking.UserID)
+			continue
+		}
+
+		// Calculate MMR change
 		mmrChange := calculateMMRChange(ranking.Placement, len(rankings))
 
 		// Save match result
@@ -329,31 +373,9 @@ func (m *Match) saveResults() {
 		if err := matchRepo.UpdateStats(ctx, ranking.UserID, ranking.Placement, ranking.Kills, deaths); err != nil {
 			fmt.Printf("Error updating stats for %s: %v\n", ranking.UserID, err)
 		}
-
-		// Add to results for broadcasting
-		playerResults = append(playerResults, map[string]interface{}{
-			"user_id":       ranking.UserID,
-			"username":      ranking.Username,
-			"placement":     ranking.Placement,
-			"kills":         ranking.Kills,
-			"damage_dealt":  ranking.DamageDealt,
-			"survival_time": duration,
-			"mmr_change":    mmrChange,
-		})
 	}
 
-	// Broadcast match ended event to all players
-	m.eventChan <- MatchEvent{
-		Type: "match_ended",
-		Data: map[string]interface{}{
-			"match_id":  m.ID,
-			"duration":  duration,
-			"rankings":  playerResults,
-			"winner_id": rankings[0].UserID,
-		},
-	}
-
-	fmt.Printf("Match %s results saved successfully\n", m.ID)
+	fmt.Printf("Match %s results saved to database\n", m.ID)
 }
 
 // calculateMMRChange calculates MMR change based on placement

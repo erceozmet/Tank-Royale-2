@@ -16,7 +16,7 @@ type SessionData struct {
 	Username  string    `json:"username"`
 	Email     string    `json:"email"`
 	Token     string    `json:"token"`
-	IsGuest   bool      `json:"isGuest"`   // True for quick play guest sessions
+	IsGuest   bool      `json:"isGuest"` // True for quick play guest sessions
 	CreatedAt time.Time `json:"createdAt"`
 	LastSeen  time.Time `json:"lastSeen"`
 }

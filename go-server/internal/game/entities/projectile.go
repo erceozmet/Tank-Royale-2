@@ -11,10 +11,10 @@ type Projectile struct {
 	Velocity      Vector2D   `json:"velocity"`
 	Damage        int        `json:"damage"`
 	WeaponType    WeaponType `json:"weaponType"`
-	SpawnTime     time.Time  `json:"-"`             // Server time when spawned
-	ClientTime    time.Time  `json:"-"`             // Client timestamp for lag compensation
-	Lifetime      int        `json:"lifetime"`      // in milliseconds
-	MaxRange      float64    `json:"-"`             // Maximum travel distance
+	SpawnTime     time.Time  `json:"-"`        // Server time when spawned
+	ClientTime    time.Time  `json:"-"`        // Client timestamp for lag compensation
+	Lifetime      int        `json:"lifetime"` // in milliseconds
+	MaxRange      float64    `json:"-"`        // Maximum travel distance
 }
 
 // NewProjectile creates a new projectile

@@ -145,15 +145,19 @@ export default class GameScene extends Phaser.Scene {
 
     // Handle match end
     ws.on('match_ended', (data: any) => {
+      console.log('🏁 match_ended event received!', data);
       // Add local player ID to the data
       const gameOverData = {
         ...data,
         localPlayerId: this.localPlayerId,
       };
       
+      console.log('🏁 Transitioning to GameOverScene with data:', gameOverData);
       // Stop game scene and show game over screen
       this.scene.start('GameOverScene', gameOverData);
     });
+    
+    console.log('✅ match_ended handler registered');
 
     // Handle player death
     ws.on('player_died', (_data: any) => {

@@ -2,13 +2,16 @@
 import Phaser from 'phaser';
 import gameConfig from '../config/game-config';
 import { createControlsDisplay } from './ControlsDisplay';
-import { createHUD } from './HUD';
+import { createHUD, updateHUD } from './HUD';
 import { createMinimap } from './Minimap';
 
 export function createGameWrapper(
   playerName: string,
   _onQuit: () => void // Prefix with _ to indicate intentionally unused
 ): HTMLElement {
+  // Expose updateHUD on window so Phaser scenes can access it
+  (window as any).updateHUD = updateHUD;
+
   const container = document.createElement('div');
   container.className = 'relative w-full h-full overflow-hidden';
 

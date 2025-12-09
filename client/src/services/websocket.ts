@@ -226,8 +226,13 @@ export class WebSocketService {
    * Handle incoming message
    */
   private handleMessage(message: WebSocketMessage): void {
+    // Debug log for important events
+    if (message.type !== 'game:state' && message.type !== 'pong') {
+      console.log(`[WS] Received message type: ${message.type}`, message.payload);
+    }
+    
     const handlers = this.messageHandlers.get(message.type);
-    if (handlers) {
+    if (handlers && handlers.length > 0) {
       handlers.forEach(handler => {
         try {
           handler(message.payload);
@@ -235,6 +240,8 @@ export class WebSocketService {
           console.error(`[WS] Error in handler for ${message.type}:`, error);
         }
       });
+    } else if (message.type !== 'game:state' && message.type !== 'pong') {
+      console.warn(`[WS] No handler registered for message type: ${message.type}`);
     }
   }
 
