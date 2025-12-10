@@ -1,13 +1,27 @@
-// Minimap Component - Top-right corner
+// Minimap Component - Streamlined and clean design
 export function createMinimap(): HTMLElement {
   const container = document.createElement('div');
-  container.className = 'minimap w-48 h-48 p-2 no-select';
+  container.className = 'no-select';
+  container.style.cssText = `
+    width: 140px;
+    height: 140px;
+    background: rgba(15, 23, 42, 0.85);
+    border-radius: 8px;
+    padding: 8px;
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  `;
 
   // Canvas for minimap rendering
   const canvas = document.createElement('canvas');
-  canvas.width = 192;
-  canvas.height = 192;
-  canvas.className = 'w-full h-full rounded-lg';
+  canvas.width = 124;
+  canvas.height = 124;
+  canvas.style.cssText = `
+    width: 100%;
+    height: 100%;
+    border-radius: 4px;
+  `;
   container.appendChild(canvas);
 
   // Initialize minimap rendering
@@ -30,71 +44,64 @@ function initMinimapRendering(canvas: HTMLCanvasElement) {
   let playerY = 0;
 
   function render() {
-    if (!ctx) return; // Guard against null context
+    if (!ctx) return;
     
-    // Clear canvas
-    ctx.fillStyle = '#f9fafb'; // Light gray background
+    // Clear canvas with dark background
+    ctx.fillStyle = '#1e293b';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Draw map border
-    ctx.strokeStyle = '#d1d5db';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(0, 0, canvas.width, canvas.height);
-
-    // Draw safe zone circle
-    // Currently using square map (mapWidth === mapHeight)
-    // For future non-square maps, adjust scale calculation
+    // Calculate scale
     const scale = canvas.width / Math.max(mapWidth, mapHeight);
-    const centerX = (safeZoneX * scale);
-    const centerY = (safeZoneY * scale);
+    const centerX = safeZoneX * scale;
+    const centerY = safeZoneY * scale;
     const radius = safeZoneRadius * scale;
 
-    // Outer danger zone (red tint)
-    ctx.fillStyle = 'rgba(239, 68, 68, 0.1)';
+    // Danger zone (subtle red tint)
+    ctx.fillStyle = 'rgba(239, 68, 68, 0.15)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Safe zone (white)
-    ctx.fillStyle = '#ffffff';
+    // Safe zone (darker area)
+    ctx.fillStyle = '#334155';
     ctx.beginPath();
     ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
     ctx.fill();
 
-    // Safe zone border (blue)
-    ctx.strokeStyle = '#3b82f6';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Draw player position (green dot)
-    const playerPosX = (playerX * scale);
-    const playerPosY = (playerY * scale);
-    
-    ctx.fillStyle = '#10b981';
-    ctx.beginPath();
-    ctx.arc(playerPosX, playerPosY, 4, 0, Math.PI * 2);
-    ctx.fill();
-    
-    // Player dot border
-    ctx.strokeStyle = '#ffffff';
+    // Safe zone border (cyan/blue glow)
+    ctx.strokeStyle = '#22d3ee';
     ctx.lineWidth = 2;
+    ctx.shadowColor = '#22d3ee';
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Player position
+    const playerPosX = playerX * scale;
+    const playerPosY = playerY * scale;
+    
+    // Player dot with glow
+    ctx.fillStyle = '#10b981';
+    ctx.shadowColor = '#10b981';
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.arc(playerPosX, playerPosY, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    
+    // White border on player dot
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(playerPosX, playerPosY, 4, 0, Math.PI * 2);
     ctx.stroke();
-
-    // Add "YOU" label
-    ctx.fillStyle = '#059669';
-    ctx.font = 'bold 10px Inter';
-    ctx.textAlign = 'center';
-    ctx.fillText('YOU', playerPosX, playerPosY - 8);
 
     requestAnimationFrame(render);
   }
 
-  // Start rendering loop
   render();
 
-  // Expose update functions
+  // Expose update function
   (window as any).updateMinimap = (data: {
     playerX: number;
     playerY: number;

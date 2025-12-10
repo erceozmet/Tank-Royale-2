@@ -286,10 +286,13 @@ func (m *Match) saveResults() {
 		})
 	}
 
-	// Determine winner
+	// Determine winner - find player with placement == 1
 	winnerId := ""
-	if len(rankings) > 0 {
-		winnerId = rankings[0].UserID
+	for _, ranking := range rankings {
+		if ranking.Placement == 1 {
+			winnerId = ranking.UserID
+			break
+		}
 	}
 
 	// ALWAYS broadcast match ended event to all players

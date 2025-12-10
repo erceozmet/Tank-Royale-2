@@ -39,6 +39,11 @@ export default class GameScene extends Phaser.Scene {
   }
 
   create(data: { matchId?: string }) {
+    console.log('🎮 GameScene: create() called');
+    
+    // Show HUD elements when game starts
+    this.setHUDVisibility(true);
+    
     // CRITICAL: Prevent scene from pausing when tab loses focus
     // We need to keep processing WebSocket game state updates for multiplayer
     this.sys.events.on('pause', () => {
@@ -61,6 +66,9 @@ export default class GameScene extends Phaser.Scene {
 
     // Set up input
     this.setupInput();
+    
+    // CRITICAL: Ensure game canvas has focus for keyboard input
+    this.game.canvas.focus();
 
     // Connect to WebSocket and setup handlers
     const ws = getWebSocketService();
@@ -85,41 +93,21 @@ export default class GameScene extends Phaser.Scene {
   }
 
   private createTerrainBackground() {
-    // Create procedural terrain using simple rectangles
-    // Colors: grass (green) and dirt (brown)
-    const grassColor = 0x3a5a38; // Medium green
-    const dirtColor = 0x6b5344;  // Brown
-    const tileSize = 64; // Size of each tile
-    
-    const terrainGraphics = this.add.graphics();
-    terrainGraphics.setDepth(-100); // Behind everything
-    
-    // Create a seeded random for consistent terrain
-    const seed = 12345;
-    let random = seed;
-    const seededRandom = () => {
-      random = (random * 9301 + 49297) % 233280;
-      return random / 233280;
-    };
-    
-    // Fill the map with tiles (60% grass, 40% dirt)
-    for (let y = 0; y < MAP_HEIGHT; y += tileSize) {
-      for (let x = 0; x < MAP_WIDTH; x += tileSize) {
-        const color = seededRandom() < 0.6 ? grassColor : dirtColor;
-        
-        // Add slight color variation for visual interest
-        const variation = Math.floor(seededRandom() * 15) - 7;
-        const variedColor = color + (variation << 16) + (variation << 8) + variation;
-        
-        terrainGraphics.fillStyle(variedColor, 1);
-        terrainGraphics.fillRect(x, y, tileSize, tileSize);
-      }
-    }
+    // Single large 4000x4000 arena map with varied terrain (LPC Terrains - CC-BY-SA 3.0)
+    // Using one image eliminates the repeating tile pattern
+    const bg = this.add.image(0, 0, 'arena-map');
+    bg.setOrigin(0, 0);
+    bg.setDepth(-100);
   }
 
   private setupInput() {
-    if (!this.input.keyboard) return;
+    if (!this.input.keyboard) {
+      console.warn('⚠️ Keyboard input not available');
+      return;
+    }
 
+    console.log('🎮 Setting up keyboard input');
+    
     this.keys = {
       w: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
       a: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
@@ -128,9 +116,11 @@ export default class GameScene extends Phaser.Scene {
     };
 
     // Mouse click to shoot
-    this.input.on('pointerdown', () => {
-      this.sendInput(true);
-    });
+    this.input.on('pointerdown', this.handlePointerDown, this);
+  }
+
+  private handlePointerDown() {
+    this.sendInput(true);
   }
 
   private setupWebSocketHandlers() {
@@ -266,9 +256,8 @@ export default class GameScene extends Phaser.Scene {
     projectiles.forEach(proj => {
       let sprite = this.projectileSprites.get(proj.id);
       if (!sprite) {
-        // Determine bullet color based on owner (green = player, red = enemy)
-        const bulletKey = proj.ownerId === this.localPlayerId ? 'bullet-green' : 'bullet-red';
-        sprite = this.add.sprite(proj.position.x, proj.position.y, bulletKey);
+        // Use gray bullet for all projectiles
+        sprite = this.add.sprite(proj.position.x, proj.position.y, 'bullet-gray');
         sprite.setOrigin(0.5, 0.5); // Center origin for proper rotation
         sprite.setScale(0.8); // Scale down bullets slightly
         this.projectileSprites.set(proj.id, sprite);
@@ -477,6 +466,17 @@ export default class GameScene extends Phaser.Scene {
           worldPoint.y
         );
       }
+    } else {
+      // Fallback: calculate angle from screen center to pointer
+      // This handles the first shot before game state is received
+      const screenCenterX = this.cameras.main.width / 2;
+      const screenCenterY = this.cameras.main.height / 2;
+      aimAngle = Phaser.Math.Angle.Between(
+        screenCenterX,
+        screenCenterY,
+        pointer.x,
+        pointer.y
+      );
     }
 
     ws.send('player_input', {
@@ -497,6 +497,15 @@ export default class GameScene extends Phaser.Scene {
     ws.clearHandlers('match_ended');
     ws.clearHandlers('player_died');
     
+    // Clean up input handlers - CRITICAL for scene restart
+    if (this.input.keyboard) {
+      this.input.keyboard.removeAllKeys(true);
+    }
+    this.keys = null;
+    
+    // Remove pointer event handler
+    this.input.off('pointerdown', this.handlePointerDown, this);
+    
     // Clear sprite maps
     this.tanks.forEach(tankData => tankData.tank.destroy());
     this.tanks.clear();
@@ -510,6 +519,19 @@ export default class GameScene extends Phaser.Scene {
     this.crateSprites.forEach(sprite => sprite.destroy());
     this.crateSprites.clear();
     
+    // Hide HUD when leaving game scene
+    this.setHUDVisibility(false);
+    
     console.log('🛑 GameScene: Shutdown complete');
+  }
+
+  /**
+   * Show or hide the game HUD elements (health bar, minimap, controls)
+   */
+  private setHUDVisibility(visible: boolean) {
+    const gameUIOverlay = document.querySelector('.game-ui-overlay') as HTMLElement;
+    if (gameUIOverlay) {
+      gameUIOverlay.style.display = visible ? 'block' : 'none';
+    }
   }
 }

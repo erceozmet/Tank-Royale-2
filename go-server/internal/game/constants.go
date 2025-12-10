@@ -29,7 +29,7 @@ const (
 // Player constants
 const (
 	PlayerMaxHealth   = 100
-	PlayerBaseSpeed   = 5.0  // Units per tick
+	PlayerBaseSpeed   = 7.5  // Units per tick (50% faster than original 5.0)
 	PlayerRadius      = 20.0 // Collision radius
 	PlayerSpawnRadius = 50.0 // Spawn distance from center
 )
@@ -63,28 +63,28 @@ var WeaponStatsMap = map[entities.WeaponType]WeaponStats{
 		BaseDamage: 15,
 		FireRate:   500 * time.Millisecond,
 		Range:      600.0,
-		Speed:      10.0,
+		Speed:      20.0, // 2x speed (was 10.0)
 		Lifetime:   3000,
 	},
 	entities.WeaponRifle: {
 		BaseDamage: 20,
 		FireRate:   400 * time.Millisecond,
 		Range:      800.0,
-		Speed:      12.0,
+		Speed:      24.0, // 2x speed (was 12.0)
 		Lifetime:   3500,
 	},
 	entities.WeaponShotgun: {
 		BaseDamage: 35,
 		FireRate:   800 * time.Millisecond,
 		Range:      400.0,
-		Speed:      8.0,
+		Speed:      16.0, // 2x speed (was 8.0)
 		Lifetime:   2000,
 	},
 	entities.WeaponSniper: {
 		BaseDamage: 50,
 		FireRate:   1200 * time.Millisecond,
 		Range:      1200.0,
-		Speed:      15.0,
+		Speed:      30.0, // 2x speed (was 15.0)
 		Lifetime:   4000,
 	},
 }
@@ -131,11 +131,11 @@ const (
 	// Memory impact is minimal; gameplay fairness is the main consideration.
 	LagCompensationBuffer = 350 * time.Millisecond // Recommended: 200-500ms
 
-	MaxMessageSize       = 65536             // Max WebSocket message size
-	WriteWait            = 10 * time.Second  // Time allowed to write message
-	PongWait             = 60 * time.Second  // Time allowed to read pong
-	PingPeriod           = (PongWait * 9) / 10 // Send pings to peer with this period
-	MaxMessageQueueSize  = 256              // Max messages queued per connection
+	MaxMessageSize      = 65536               // Max WebSocket message size
+	WriteWait           = 10 * time.Second    // Time allowed to write message
+	PongWait            = 60 * time.Second    // Time allowed to read pong
+	PingPeriod          = (PongWait * 9) / 10 // Send pings to peer with this period
+	MaxMessageQueueSize = 256                 // Max messages queued per connection
 )
 
 // Calculate effective weapon stats with boosts

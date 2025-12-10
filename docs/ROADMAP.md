@@ -4,6 +4,53 @@ This roadmap breaks down the Tank Royale 2 project into manageable phases with s
 
 ---
 
+## Current Status (December 2024)
+
+### Recently Completed ✅
+- **Game Over Screens**: Victory/Defeat screens with elegant HTML overlay styling
+- **Matchmaking UI**: Streamlined queue screen with dark glassmorphism design
+- **HUD Improvements**: 
+  - Health bar now updates in real-time when player takes damage
+  - Compact dark-themed design with gradient health bars
+  - Streamlined minimap (140x140, dark theme, cyan safe zone glow)
+- **Tank Turret**: Fixed positioning so turret pivots from center, barrel follows mouse
+- **Bullet Styling**: Changed to gray bullets for all projectiles
+- **Game Balance**:
+  - Tank speed increased 50% (5.0 → 7.5 units/tick)
+  - Bullet speed doubled (all weapons)
+- **Scene Lifecycle**: Fixed keyboard input issues on scene restart
+
+### Immediate Priorities 🔄
+
+#### 1. Match Start Synchronization (High Priority)
+- [ ] Add "Waiting for Players" screen after lobby creation
+  - [ ] Show loading progress for all players
+  - [ ] Display connected player count
+  - [ ] Ensure all players have rendered the map
+- [ ] Implement 3-second countdown overlay
+  - [ ] Large centered countdown (3... 2... 1...)
+  - [ ] "GO!" message with animation
+  - [ ] Disable player input during countdown
+- [ ] Server-side ready check
+  - [ ] Track player ready state
+  - [ ] Broadcast countdown start when all ready
+  - [ ] Synchronized game start timestamp
+
+#### 2. Map Visual Enhancement (Medium Priority)
+- [ ] Research and implement prettier terrain
+  - Options to explore:
+    - LPC Terrains (OpenGameArt) - grass/dirt/rock tiles
+    - Pixel art tilesets from itch.io (Cainos, Mystic Woods style)
+    - DND-style battle map aesthetic
+- [ ] Add environmental details
+  - [ ] Scattered rocks/pebbles
+  - [ ] Grass tufts/flowers
+  - [ ] Tree shadows (non-collidable)
+  - [ ] Water puddles/ponds
+- [ ] Improve safe zone visualization
+
+---
+
 ## Phase 1: Foundation & Infrastructure ✅ (Completed)
 
 **Goal**: Set up project structure, databases, and shared code
@@ -656,15 +703,20 @@ GET /api/leaderboard/friends
 | Phase | Duration | Status |
 |-------|----------|--------|
 | 1. Foundation | 1 week | ✅ Complete |
-| 2. Backend API | 1-2 weeks | 🔄 Current |
-| 3. WebSocket & Matchmaking | 1-2 weeks | ⏳ Planned |
-| 4. Game Server Core | 2-3 weeks | ⏳ Planned |
-| 5. Game Features | 2 weeks | ⏳ Planned |
-| 6. Frontend Client | 2-3 weeks | ⏳ Planned |
+| 2. Backend API | 1-2 weeks | ✅ Complete |
+| 3. WebSocket & Matchmaking | 1-2 weeks | ✅ Complete |
+| 4. Game Server Core | 2-3 weeks | ✅ Complete |
+| 5. Game Features | 2 weeks | ✅ Complete |
+| 6. Frontend Client | 2-3 weeks | ✅ Complete |
 | 7. Leaderboards | 1 week | ⏳ Planned |
-| 8. Polish | 1-2 weeks | ⏳ Planned |
+| 8. Polish | 1-2 weeks | 🔄 In Progress |
 | 9. Deployment | 1 week | ⏳ Planned |
 | 10. Advanced Features | Variable | 🔮 Optional |
+
+### Current Sprint (December 2024)
+- 🔄 Match start synchronization (countdown, ready check)
+- 🔄 Map visual improvements
+- ⏳ Additional game polish
 
 **Total Estimated Time**: 12-18 weeks for core features
 
