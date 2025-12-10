@@ -352,8 +352,13 @@ func (gl *GameLoop) applySafeZoneDamage() {
 // checkWinCondition checks if the game should end
 func (gl *GameLoop) checkWinCondition() {
 	aliveCount := gl.state.GetAlivePlayerCount()
+	totalPlayers := len(gl.state.Players)
 
-	if aliveCount <= 1 && gl.state.Phase == PhasePlaying {
+	// Only end if: all players are dead OR (more than 1 total player AND only 1 left alive)
+	// This allows solo testing without immediate game over
+	shouldEnd := aliveCount == 0 || (totalPlayers > 1 && aliveCount <= 1)
+
+	if shouldEnd && gl.state.Phase == PhasePlaying {
 		gl.state.Phase = PhaseEnding
 		// Game will end after a few seconds to show results
 	}

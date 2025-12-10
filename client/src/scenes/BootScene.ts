@@ -22,7 +22,9 @@ export default class BootScene extends Phaser.Scene {
     this.load.image('tank-turret-green', '/assets/sprites/tanks/turret-green.png');
     this.load.image('tank-turret-red', '/assets/sprites/tanks/turret-red.png');
 
-    // Load bullet sprites (green for player, red for enemies)
+    // Load bullet sprites (gray for all)
+    this.load.image('bullet-gray', '/assets/sprites/weapons/bulletGray.png');
+    // Legacy bullet colors (kept for compatibility)
     this.load.image('bullet-green', '/assets/sprites/weapons/bulletGreen.png');
     this.load.image('bullet-red', '/assets/sprites/weapons/bulletRed.png');
 
@@ -37,6 +39,10 @@ export default class BootScene extends Phaser.Scene {
       this.load.image(`explosion-orange-${i}`, `/assets/sprites/effects/smokeOrange${i}.png`);
       this.load.image(`smoke-grey-${i}`, `/assets/sprites/effects/smokeGrey${i}.png`);
     }
+
+    // Load terrain background (LPC Terrains by bluecarrot16 et al. - CC-BY-SA 3.0)
+    // Single large 4000x4000 arena map with varied terrain
+    this.load.image('arena-map', '/assets/terrain/arena-map.jpg');
   }
 
   create() {

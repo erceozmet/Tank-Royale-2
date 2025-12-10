@@ -2,25 +2,16 @@ import Phaser from 'phaser';
 import { joinQueue, leaveQueue, getQueueStatus } from '../services/matchmaking';
 import { getWebSocketService } from '../services/websocket';
 import { getToken } from '../services/auth';
-import { COLORS } from '../config/constants';
 
 /**
  * MatchmakingScene - Handles lobby search and matchmaking
- * Shows queue status, estimated wait time, and allows cancellation
+ * Uses elegant HTML overlay matching the AuthScreen style
  */
 export default class MatchmakingScene extends Phaser.Scene {
-  private searchingText!: Phaser.GameObjects.Text;
-  private statusText!: Phaser.GameObjects.Text;
-  private playersInQueueText!: Phaser.GameObjects.Text;
-  private cancelButton!: Phaser.GameObjects.Rectangle;
-  private cancelButtonText!: Phaser.GameObjects.Text;
-  private loadingDots: string = '';
+  private overlay: HTMLDivElement | null = null;
   private statusCheckInterval: number | null = null;
   private inQueue: boolean = false;
-
-  // Animation elements
-  private searchIcon!: Phaser.GameObjects.Graphics;
-  private rotationAngle: number = 0;
+  private dotsInterval: number | null = null;
 
   constructor() {
     super({ key: 'MatchmakingScene' });
@@ -29,11 +20,8 @@ export default class MatchmakingScene extends Phaser.Scene {
   create() {
     console.log('🔍 MatchmakingScene: Starting lobby search');
 
-    // Set background
-    this.cameras.main.setBackgroundColor(COLORS.BACKGROUND);
-
-    // Create UI elements
-    this.createUI();
+    // Create HTML overlay
+    this.createOverlay();
 
     // Setup WebSocket listeners for match found
     this.setupWebSocketListeners();
@@ -45,131 +33,131 @@ export default class MatchmakingScene extends Phaser.Scene {
     this.startStatusPolling();
   }
 
-  private createUI() {
-    const centerX = this.cameras.main.width / 2;
-    const centerY = this.cameras.main.height / 2;
+  private createOverlay() {
+    this.overlay = document.createElement('div');
+    this.overlay.id = 'matchmaking-overlay';
+    this.overlay.className = 'fixed inset-0 z-50 flex items-center justify-center';
+    this.overlay.style.background = 'linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%)';
 
-    // Title
-    const title = this.add.text(centerX, centerY - 200, 'FINDING MATCH', {
-      fontSize: '48px',
-      color: '#ffffff',
-      fontStyle: 'bold',
-      fontFamily: 'Arial',
-    });
-    title.setOrigin(0.5);
+    this.overlay.innerHTML = `
+      <div class="flex flex-col items-center gap-6 w-[450px]">
+        <!-- Logo -->
+        <div class="text-center mb-2">
+          <h1 class="text-5xl font-display font-bold text-gray-900 tracking-wider mb-2">
+            blast<span class="text-blue-500">.io</span>
+          </h1>
+        </div>
 
-    // Searching animation icon (spinning circle)
-    // TODO: Replace with AI-generated loading spinner asset
-    this.searchIcon = this.add.graphics();
-    this.searchIcon.x = centerX;
-    this.searchIcon.y = centerY - 80;
-    this.drawSearchIcon();
+        <!-- Main Card -->
+        <div class="card-elegant w-full text-center">
+          <!-- Animated Loading Spinner -->
+          <div class="mb-6">
+            <div class="inline-flex items-center justify-center w-20 h-20 relative">
+              <div class="absolute inset-0 border-4 border-blue-200 rounded-full"></div>
+              <div class="absolute inset-0 border-4 border-blue-500 rounded-full border-t-transparent animate-spin"></div>
+              <svg class="w-8 h-8 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+              </svg>
+            </div>
+          </div>
 
-    // Searching text with animated dots
-    this.searchingText = this.add.text(centerX, centerY, 'Searching for players...', {
-      fontSize: '24px',
-      color: '#aaaaaa',
-      fontFamily: 'Arial',
-    });
-    this.searchingText.setOrigin(0.5);
+          <!-- Status Text -->
+          <div class="mb-6">
+            <h2 class="text-2xl font-bold text-gray-900 mb-2">Finding Match</h2>
+            <p id="searching-text" class="text-gray-500">Searching for players...</p>
+          </div>
 
-    // Queue status
-    this.statusText = this.add.text(centerX, centerY + 50, 'Estimated wait: --s', {
-      fontSize: '20px',
-      color: '#888888',
-      fontFamily: 'Arial',
-    });
-    this.statusText.setOrigin(0.5);
+          <!-- Queue Stats -->
+          <div class="grid grid-cols-2 gap-4 mb-6">
+            <div class="bg-gray-50 rounded-xl p-4">
+              <div id="players-count" class="text-3xl font-bold font-mono text-blue-600">--</div>
+              <div class="text-sm text-gray-500 font-semibold">In Queue</div>
+            </div>
+            <div class="bg-gray-50 rounded-xl p-4">
+              <div id="wait-time" class="text-3xl font-bold font-mono text-gray-900">--</div>
+              <div class="text-sm text-gray-500 font-semibold">Est. Wait</div>
+            </div>
+          </div>
 
-    // Players in queue
-    this.playersInQueueText = this.add.text(centerX, centerY + 90, 'Players in queue: --', {
-      fontSize: '20px',
-      color: '#888888',
-      fontFamily: 'Arial',
-    });
-    this.playersInQueueText.setOrigin(0.5);
+          <!-- Info Text -->
+          <p class="text-sm text-gray-400 mb-6">Need 2+ players to start a match</p>
 
-    // Cancel button
-    // TODO: Replace with AI-generated button asset with hover effects
-    const buttonWidth = 200;
-    const buttonHeight = 50;
-    this.cancelButton = this.add.rectangle(
-      centerX,
-      centerY + 180,
-      buttonWidth,
-      buttonHeight,
-      0xff4444
-    );
-    this.cancelButton.setInteractive({ useHandCursor: true });
-    this.cancelButton.setStrokeStyle(2, 0xffffff);
+          <!-- Cancel Button -->
+          <button id="cancel-btn" class="w-full px-6 py-3 bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-600 font-semibold rounded-xl transition-all border border-transparent hover:border-red-200">
+            Cancel
+          </button>
+        </div>
 
-    this.cancelButtonText = this.add.text(centerX, centerY + 180, 'CANCEL', {
-      fontSize: '20px',
-      color: '#ffffff',
-      fontStyle: 'bold',
-      fontFamily: 'Arial',
-    });
-    this.cancelButtonText.setOrigin(0.5);
+        <!-- Tips Card -->
+        <div class="card-elegant w-full">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+              <svg class="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+              </svg>
+            </div>
+            <div class="text-left">
+              <div class="font-semibold text-gray-900 text-sm">Pro Tip</div>
+              <div class="text-xs text-gray-500">Use WASD to move, mouse to aim, click to shoot!</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
 
-    // Button hover effects
-    this.cancelButton.on('pointerover', () => {
-      this.cancelButton.setFillStyle(0xff6666);
-      this.cancelButton.setScale(1.05);
-    });
+    document.body.appendChild(this.overlay);
 
-    this.cancelButton.on('pointerout', () => {
-      this.cancelButton.setFillStyle(0xff4444);
-      this.cancelButton.setScale(1.0);
-    });
-
-    this.cancelButton.on('pointerdown', () => {
+    // Add cancel button listener
+    const cancelBtn = this.overlay.querySelector('#cancel-btn');
+    cancelBtn?.addEventListener('click', () => {
       this.cancelMatchmaking();
     });
 
-    // Helper text
-    const helperText = this.add.text(centerX, centerY + 260, 
-      'Need 8-16 players to start a match', {
-      fontSize: '16px',
-      color: '#666666',
-      fontFamily: 'Arial',
-      align: 'center',
-    });
-    helperText.setOrigin(0.5);
+    // Start dots animation
+    this.startDotsAnimation();
   }
 
-  private drawSearchIcon() {
-    this.searchIcon.clear();
-    
-    // Draw rotating loading circle
-    // TODO: Replace with AI-generated animated loading icon
-    this.searchIcon.lineStyle(4, 0x3b82f6, 1);
-    this.searchIcon.beginPath();
-    this.searchIcon.arc(0, 0, 40, this.rotationAngle, this.rotationAngle + Math.PI * 1.5);
-    this.searchIcon.strokePath();
-    
-    // Inner circle
-    this.searchIcon.lineStyle(2, 0x60a5fa, 0.5);
-    this.searchIcon.beginPath();
-    this.searchIcon.arc(0, 0, 30, -this.rotationAngle, -this.rotationAngle + Math.PI);
-    this.searchIcon.strokePath();
+  private startDotsAnimation() {
+    let dots = 0;
+    this.dotsInterval = window.setInterval(() => {
+      dots = (dots + 1) % 4;
+      const searchText = this.overlay?.querySelector('#searching-text');
+      if (searchText) {
+        searchText.textContent = 'Searching for players' + '.'.repeat(dots);
+      }
+    }, 500);
   }
 
   private setupWebSocketListeners() {
     const ws = getWebSocketService();
 
-    // Listen for match_found event
     ws.on('match_found', (payload: any) => {
       console.log('🎮 Match found!', payload);
       this.onMatchFound(payload);
     });
 
-    // Listen for queue_update events
     ws.on('queue_update', (payload: any) => {
       console.log('📊 Queue update:', payload);
-      if (payload.playersInQueue !== undefined) {
-        this.playersInQueueText.setText(`Players in queue: ${payload.playersInQueue}`);
-      }
+      this.updateQueueDisplay(payload.playersInQueue, payload.estimatedWaitTime);
     });
+  }
+
+  private updateQueueDisplay(playersInQueue?: number, estimatedWait?: number) {
+    if (!this.overlay) return;
+
+    if (playersInQueue !== undefined) {
+      const playersEl = this.overlay.querySelector('#players-count');
+      if (playersEl) {
+        playersEl.textContent = playersInQueue.toString();
+      }
+    }
+
+    if (estimatedWait !== undefined) {
+      const waitEl = this.overlay.querySelector('#wait-time');
+      if (waitEl) {
+        waitEl.textContent = `${estimatedWait}s`;
+      }
+    }
   }
 
   private async joinMatchmakingQueue() {
@@ -179,14 +167,11 @@ export default class MatchmakingScene extends Phaser.Scene {
       console.log('✅ Joined matchmaking queue');
     } catch (error) {
       console.error('❌ Failed to join queue:', error);
-      this.statusText.setText('Failed to join queue');
-      this.statusText.setColor('#ff4444');
-      
-      // Stay on matchmaking screen and allow retry
-      this.time.delayedCall(2000, () => {
-        this.statusText.setText('Click "Find Match" to try again');
-        this.statusText.setColor('#ffffff');
-      });
+      const searchText = this.overlay?.querySelector('#searching-text');
+      if (searchText) {
+        searchText.textContent = 'Failed to join queue. Try again.';
+        (searchText as HTMLElement).style.color = '#ef4444';
+      }
     }
   }
 
@@ -201,22 +186,19 @@ export default class MatchmakingScene extends Phaser.Scene {
       console.error('❌ Failed to leave queue:', error);
     }
 
-    // Clean up
-    this.stopStatusPolling();
+    this.cleanup();
     
-    // Reset UI to initial state (stay on matchmaking screen)
-    this.statusText.setText('Queue cancelled');
-    this.statusText.setColor('#ffffff');
-    this.playersInQueueText.setText('');
+    // Return to main menu
+    if ((window as any).returnToMainMenu) {
+      (window as any).returnToMainMenu();
+    }
   }
 
   private startStatusPolling() {
-    // Poll queue status every 2 seconds
     this.statusCheckInterval = window.setInterval(() => {
       this.checkQueueStatus();
     }, 2000);
 
-    // Initial check
     this.checkQueueStatus();
   }
 
@@ -233,21 +215,13 @@ export default class MatchmakingScene extends Phaser.Scene {
     try {
       const status = await getQueueStatus();
       
-      // Check if match was found
       if (status.status === 'matched' || status.matched || status.matchId) {
         console.log('🎉 Match found via polling! Match ID:', status.matchId);
         this.onMatchFound({ matchId: status.matchId, playerCount: status.playerCount });
         return;
       }
 
-      // Update UI with queue status
-      if (status.playersInQueue !== undefined) {
-        this.playersInQueueText.setText(`Players in queue: ${status.playersInQueue}`);
-      }
-
-      if (status.estimatedWaitTime !== undefined) {
-        this.statusText.setText(`Estimated wait: ${status.estimatedWaitTime}s`);
-      }
+      this.updateQueueDisplay(status.playersInQueue, status.estimatedWaitTime);
     } catch (error) {
       console.error('Failed to check queue status:', error);
     }
@@ -256,20 +230,19 @@ export default class MatchmakingScene extends Phaser.Scene {
   private async onMatchFound(payload: any) {
     console.log('🎉 Match found! Starting game...', payload);
     
-    // Stop polling
     this.stopStatusPolling();
     this.inQueue = false;
 
-    // Update UI
-    this.searchingText.setText('Match Found!');
-    this.searchingText.setColor('#10b981');
-    this.statusText.setText('Connecting to game server...');
+    // Update UI to show match found
+    const searchText = this.overlay?.querySelector('#searching-text');
+    if (searchText) {
+      searchText.textContent = '🎉 Match Found! Connecting...';
+      (searchText as HTMLElement).style.color = '#10b981';
+    }
 
-    // Store match data
     this.registry.set('matchId', payload.matchId);
 
     try {
-      // Ensure WebSocket is connected to game server
       const ws = getWebSocketService();
       if (!ws.isConnected()) {
         console.log('🔌 Connecting to game server...');
@@ -281,39 +254,40 @@ export default class MatchmakingScene extends Phaser.Scene {
         console.log('✅ Connected to game server');
       }
 
-      // Transition to game scene after brief delay
       this.time.delayedCall(500, () => {
         console.log('Transitioning to GameScene with matchId:', payload.matchId);
+        this.cleanup();
         this.scene.start('GameScene', {
           matchId: payload.matchId,
         });
       });
     } catch (error) {
       console.error('❌ Failed to connect to game server:', error);
-      this.statusText.setText('Connection failed. Try again.');
-      this.statusText.setColor('#ff4444');
-      // Stay on matchmaking screen, allow retry
+      if (searchText) {
+        searchText.textContent = 'Connection failed. Try again.';
+        (searchText as HTMLElement).style.color = '#ef4444';
+      }
     }
   }
 
-  update(time: number, _delta: number) {
-    // Animate loading dots
-    const dotsCount = Math.floor((time / 500) % 4);
-    this.loadingDots = '.'.repeat(dotsCount);
-    this.searchingText.setText(`Searching for players${this.loadingDots}`);
+  private cleanup() {
+    this.stopStatusPolling();
+    
+    if (this.dotsInterval) {
+      clearInterval(this.dotsInterval);
+      this.dotsInterval = null;
+    }
 
-    // Rotate search icon
-    this.rotationAngle += 0.05;
-    this.drawSearchIcon();
+    if (this.overlay) {
+      this.overlay.remove();
+      this.overlay = null;
+    }
   }
 
   shutdown() {
     console.log('🛑 MatchmakingScene: Shutting down');
+    this.cleanup();
     
-    // Clean up
-    this.stopStatusPolling();
-    
-    // Remove WebSocket listeners
     const ws = getWebSocketService();
     ws.off('match_found', this.onMatchFound);
     ws.off('queue_update', () => {});

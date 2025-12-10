@@ -207,12 +207,17 @@ func (m *Match) monitorMatch() {
 func (m *Match) checkEndConditions() {
 	m.mu.RLock()
 	state := m.GameLoop.GetState()
+	totalPlayers := len(m.Players)
 	m.mu.RUnlock()
 
-	// Check if only one player is left
+	// Check if only one player is left (battle royale win condition)
 	aliveCount := state.GetAlivePlayerCount()
 
-	if aliveCount <= 1 && m.Phase == engine.PhasePlaying {
+	// Only end if: all players are dead OR (more than 1 total player AND only 1 left alive)
+	// This allows solo testing without immediate game over
+	shouldEnd := aliveCount == 0 || (totalPlayers > 1 && aliveCount <= 1)
+
+	if shouldEnd && m.Phase == engine.PhasePlaying {
 		m.endMatch()
 	}
 
@@ -286,10 +291,13 @@ func (m *Match) saveResults() {
 		})
 	}
 
-	// Determine winner
+	// Determine winner - find player with placement == 1
 	winnerId := ""
-	if len(rankings) > 0 {
-		winnerId = rankings[0].UserID
+	for _, ranking := range rankings {
+		if ranking.Placement == 1 {
+			winnerId = ranking.UserID
+			break
+		}
 	}
 
 	// ALWAYS broadcast match ended event to all players

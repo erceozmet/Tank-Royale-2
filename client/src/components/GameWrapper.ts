@@ -7,10 +7,16 @@ import { createMinimap } from './Minimap';
 
 export function createGameWrapper(
   playerName: string,
-  _onQuit: () => void // Prefix with _ to indicate intentionally unused
+  onQuit: () => void
 ): HTMLElement {
   // Expose updateHUD on window so Phaser scenes can access it
   (window as any).updateHUD = updateHUD;
+  
+  // Expose returnToMainMenu so Phaser scenes can navigate back to auth screen
+  (window as any).returnToMainMenu = () => {
+    console.log('🏠 Returning to main menu');
+    onQuit();
+  };
 
   const container = document.createElement('div');
   container.className = 'relative w-full h-full overflow-hidden';
@@ -23,6 +29,7 @@ export function createGameWrapper(
   // UI overlay container
   const uiOverlay = document.createElement('div');
   uiOverlay.className = 'game-ui-overlay';
+  uiOverlay.style.display = 'none'; // Hidden by default, shown when GameScene starts
 
   // Add controls display (bottom-left)
   const controls = createControlsDisplay();
