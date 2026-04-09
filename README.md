@@ -2,26 +2,9 @@
 
 A real-time multiplayer .io-style battle royale game built to showcase system design, multi-threading, caching, and distributed databases.
 
-## 🚀 Quick Start
+Design Architecture
+<img width="1184" height="1170" alt="Screenshot_2026-04-09_17-46-13" src="https://github.com/user-attachments/assets/97bb51b9-fc27-4ec8-8a63-de98d0741ee4" />
 
-```bash
-# First time setup
-make setup
-
-# Start everything
-make start
-
-# Stop everything
-make stop
-
-# See all commands
-make help
-```
-
-**That's it!** Access services at:
-- API Server: http://localhost:8080
-- Game Server: http://localhost:8081
-- Grafana: http://localhost:3001 (admin/admin123)
 
 📖 Full docs: [START_HERE.md](START_HERE.md) | [BOOT_COMMANDS.md](BOOT_COMMANDS.md)
 
