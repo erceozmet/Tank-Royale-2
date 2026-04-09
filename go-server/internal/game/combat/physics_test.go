@@ -382,7 +382,7 @@ func TestCheckPlayerCollisions_DeadPlayersIgnored(t *testing.T) {
 		"dead": {
 			ID:       "dead",
 			Position: entities.Vector2D{X: 100, Y: 100}, // Same position as player1
-			IsAlive:  false,                              // Dead
+			IsAlive:  false,                             // Dead
 			Health:   0,
 		},
 	}

@@ -990,10 +990,10 @@ func TestWeaponSpeedAndRange(t *testing.T) {
 		expectedSpeed float64
 		expectedRange float64
 	}{
-		{entities.WeaponPistol, 10.0, 600.0},
-		{entities.WeaponRifle, 12.0, 800.0},
-		{entities.WeaponShotgun, 8.0, 400.0},
-		{entities.WeaponSniper, 15.0, 1200.0},
+		{entities.WeaponPistol, 20.0, 600.0},
+		{entities.WeaponRifle, 24.0, 800.0},
+		{entities.WeaponShotgun, 16.0, 400.0},
+		{entities.WeaponSniper, 30.0, 1200.0},
 	}
 
 	for _, tt := range tests {

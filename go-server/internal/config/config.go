@@ -9,12 +9,12 @@ import (
 
 // Config holds all application configuration
 type Config struct {
-	Server      ServerConfig
-	Database    DatabaseConfig
-	JWT         JWTConfig
-	Game        GameConfig
-	Logging     LoggingConfig
-	Monitoring  MonitoringConfig
+	Server     ServerConfig
+	Database   DatabaseConfig
+	JWT        JWTConfig
+	Game       GameConfig
+	Logging    LoggingConfig
+	Monitoring MonitoringConfig
 }
 
 // ServerConfig holds server-related configuration
